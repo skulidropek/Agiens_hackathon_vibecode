@@ -8,7 +8,6 @@ export interface Project {
   description?: string;
   createdAt: Date;
   lastAccessed: Date;
-  isActive?: boolean;
 }
 
 export interface CreateProjectRequest {

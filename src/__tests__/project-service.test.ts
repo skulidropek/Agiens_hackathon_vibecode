@@ -54,12 +54,11 @@ describe('ProjectService', () => {
         name: 'test-project',
         path: join(mockWorkspaceDir, 'projects', 'test-project'),
         type: 'local',
+        gitUrl: undefined,
+        branch: 'main',
         description: 'Test project',
         createdAt: expect.any(Date),
-        lastAccessed: expect.any(Date),
-        isActive: false,
-        branch: 'main',
-        gitUrl: undefined
+        lastAccessed: expect.any(Date)
       });
 
       expect(mockFs.mkdir).toHaveBeenCalledWith(
@@ -140,42 +139,7 @@ describe('ProjectService', () => {
       const result = await projectService.listProjects();
 
       expect(result.projects).toHaveLength(1);
-      expect(result.activeProject).toBeDefined();
-      expect(result.activeProject?.name).toBe('test-project');
-    });
-  });
-
-  describe('activateProject', () => {
-    it('должен активировать проект', async () => {
-      // Подготовка данных
-      const projectId = 'test-uuid-123';
-      mockFs.readFile.mockResolvedValue(JSON.stringify({
-        activeProjectId: null,
-        projects: [{
-          id: projectId,
-          name: 'test-project',
-          path: '/test/path',
-          type: 'local',
-          createdAt: '2023-01-01T00:00:00.000Z',
-          lastAccessed: '2023-01-01T00:00:00.000Z',
-          isActive: false
-        }]
-      }));
-      mockFs.writeFile.mockResolvedValue(undefined);
-
-      // Загружаем проекты
-      await projectService['loadProjects']();
-
-      const result = await projectService.activateProject(projectId);
-
-      expect(result.isActive).toBe(true);
-      expect(result.lastAccessed).toBeInstanceOf(Date);
-    });
-
-    it('должен выбросить ошибку для несуществующего проекта', async () => {
-      await expect(projectService.activateProject('nonexistent-id')).rejects.toThrow(
-        'Проект с ID nonexistent-id не найден'
-      );
+      expect(result.activeProject).toBeUndefined();
     });
   });
 
@@ -247,7 +211,7 @@ describe('ProjectService', () => {
         totalProjects: 2,
         gitProjects: 1,
         localProjects: 1,
-        activeProject: 'test-uuid-123'
+        activeProject: undefined
       });
     });
   });

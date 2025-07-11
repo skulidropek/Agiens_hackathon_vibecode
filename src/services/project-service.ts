@@ -9,7 +9,6 @@ export class ProjectService {
   private projectsDir: string;
   private projectsFile: string;
   private projects: Map<string, Project> = new Map();
-  private activeProjectId: string | null = null;
 
   constructor(workspaceDir: string) {
     this.projectsDir = join(workspaceDir, 'projects');
@@ -37,7 +36,6 @@ export class ProjectService {
       const projectsData = JSON.parse(data);
       
       this.projects.clear();
-      this.activeProjectId = projectsData.activeProjectId || null;
       
       for (const project of projectsData.projects || []) {
         this.projects.set(project.id, {
@@ -57,7 +55,6 @@ export class ProjectService {
   private async saveProjects(): Promise<void> {
     try {
       const projectsData = {
-        activeProjectId: this.activeProjectId,
         projects: Array.from(this.projects.values()).map(project => ({
           ...project,
           createdAt: project.createdAt.toISOString(),
@@ -85,7 +82,6 @@ export class ProjectService {
       description: request.description,
       createdAt: new Date(),
       lastAccessed: new Date(),
-      isActive: false
     };
 
     try {
@@ -136,41 +132,15 @@ export class ProjectService {
 
   async listProjects(): Promise<ProjectListResponse> {
     const projects = Array.from(this.projects.values());
-    const activeProject = this.activeProjectId ? this.projects.get(this.activeProjectId) : undefined;
     
     return {
       projects,
-      activeProject
+      activeProject: undefined
     };
   }
 
   async getProject(id: string): Promise<Project | undefined> {
     return this.projects.get(id);
-  }
-
-  async activateProject(id: string): Promise<Project> {
-    const project = this.projects.get(id);
-    if (!project) {
-      throw new Error(`Проект с ID ${id} не найден`);
-    }
-
-    // Деактивируем текущий активный проект
-    if (this.activeProjectId) {
-      const currentActive = this.projects.get(this.activeProjectId);
-      if (currentActive) {
-        currentActive.isActive = false;
-      }
-    }
-
-    // Активируем новый проект
-    project.isActive = true;
-    project.lastAccessed = new Date();
-    this.activeProjectId = id;
-
-    await this.saveProjects();
-    
-    logger.info(`Активирован проект: ${project.name}`);
-    return project;
   }
 
   async deleteProject(id: string): Promise<boolean> {
@@ -186,11 +156,6 @@ export class ProjectService {
       // Удаляем из коллекции
       this.projects.delete(id);
       
-      // Если это был активный проект, деактивируем
-      if (this.activeProjectId === id) {
-        this.activeProjectId = null;
-      }
-
       await this.saveProjects();
       
       logger.info(`Удален проект: ${project.name}`);
@@ -208,12 +173,8 @@ export class ProjectService {
       totalProjects: projects.length,
       gitProjects: projects.filter(p => p.type === 'git').length,
       localProjects: projects.filter(p => p.type === 'local').length,
-      activeProject: this.activeProjectId || undefined
+      activeProject: undefined
     };
-  }
-
-  getActiveProject(): Project | undefined {
-    return this.activeProjectId ? this.projects.get(this.activeProjectId) : undefined;
   }
 
   getProjectsDirectory(): string {

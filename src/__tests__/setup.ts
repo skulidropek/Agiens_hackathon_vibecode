@@ -1,7 +1,25 @@
-import { logger } from '../utils/logger';
+import { logger, LogLevel } from '../utils/logger';
 
-// Отключаем логирование во время тестов
-logger.setLevel(3); // DEBUG level, но можно поставить выше
+// Полностью отключаем логирование в тестах
+logger.setLevel(LogLevel.SILENT);
+
+// Альтернативно можно замокать весь логгер
+const originalLog = console.log;
+const originalError = console.error;
+
+beforeAll(() => {
+  // Отключаем все консольные выводы в тестах
+  console.log = jest.fn();
+  console.error = jest.fn();
+  console.warn = jest.fn();
+  console.info = jest.fn();
+});
+
+afterAll(() => {
+  // Восстанавливаем консольные выводы после тестов
+  console.log = originalLog;
+  console.error = originalError;
+});
 
 // Мок для WebSocket
 class MockWebSocket {
@@ -28,7 +46,7 @@ class MockWebSocket {
 // Мок для process.env
 process.env.NODE_ENV = 'test';
 process.env.WORKSPACE_DIR = './test-workspace';
-process.env.LOG_LEVEL = 'error';
+process.env.LOG_LEVEL = 'silent'; // Новый уровень для полного отключения
 
 // Очистка после каждого теста
 afterEach(() => {

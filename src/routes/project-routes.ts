@@ -33,21 +33,6 @@ export function setupProjectRoutes(projectServiceInstance: ProjectService): Rout
     }
   });
 
-  // GET /api/projects/active - Получить активный проект
-  router.get('/active', async (req: Request, res: Response) => {
-    try {
-      const activeProject = projectService.getActiveProject();
-      if (!activeProject) {
-        return res.status(404).json({ error: 'Активный проект не найден' });
-      }
-      res.json(activeProject);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error('Ошибка получения активного проекта:', errorMessage);
-      res.status(500).json({ error: 'Ошибка получения активного проекта' });
-    }
-  });
-
   // GET /api/projects/:id - Получить конкретный проект
   router.get('/:id', async (req: Request, res: Response) => {
     try {
@@ -87,18 +72,6 @@ export function setupProjectRoutes(projectServiceInstance: ProjectService): Rout
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error('Ошибка создания проекта:', errorMessage);
       res.status(500).json({ error: 'Ошибка создания проекта: ' + errorMessage });
-    }
-  });
-
-  // PUT /api/projects/:id/activate - Активировать проект
-  router.put('/:id/activate', async (req: Request, res: Response) => {
-    try {
-      const project = await projectService.activateProject(req.params.id);
-      res.json(project);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error('Ошибка активации проекта:', errorMessage);
-      res.status(500).json({ error: 'Ошибка активации проекта: ' + errorMessage });
     }
   });
 

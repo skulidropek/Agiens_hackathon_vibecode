@@ -11,6 +11,7 @@ export interface ChatMessage extends BaseWebSocketMessage {
   content: string;
   sender: 'user' | 'ai';
   conversationId?: string;
+  projectId?: string; // Добавляем привязку к проекту
 }
 
 export interface ChatResponse extends BaseWebSocketMessage {
@@ -18,6 +19,7 @@ export interface ChatResponse extends BaseWebSocketMessage {
   content: string;
   sender: 'ai';
   conversationId?: string;
+  projectId?: string; // Добавляем привязку к проекту
   streaming?: boolean;
 }
 
@@ -25,6 +27,7 @@ export interface ChatError extends BaseWebSocketMessage {
   type: 'chat_error';
   error: string;
   code?: string;
+  projectId?: string; // Добавляем привязку к проекту
 }
 
 // Типы сообщений для терминала
@@ -90,6 +93,9 @@ export interface FileChange extends BaseWebSocketMessage {
 
 // Типы для AI интеграции
 export interface AIContext {
+  projectId?: string; // Добавляем ID активного проекта
+  projectName?: string; // Добавляем имя проекта
+  projectPath?: string; // Добавляем путь к проекту
   workspaceFiles: FileInfo[];
   currentDirectory: string;
   terminalHistory: string[];
@@ -177,6 +183,7 @@ export interface Session {
   userId?: string;
   conversationId: string;
   terminalSessionId?: string;
+  projectId?: string; // Добавляем привязку к проекту
   createdAt: Date;
   lastActivity: Date;
   isActive: boolean;

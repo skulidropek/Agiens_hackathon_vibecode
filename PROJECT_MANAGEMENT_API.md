@@ -57,21 +57,6 @@
 }
 ```
 
-### GET /api/projects/active
-Получить активный проект
-
-**Ответ:**
-```json
-{
-  "id": "uuid-123",
-  "name": "Active Project",
-  "path": "/path/to/active",
-  "type": "local",
-  "isActive": true,
-  "..."
-}
-```
-
 ### GET /api/projects/:id
 Получить проект по ID
 
@@ -126,23 +111,6 @@
 }
 ```
 
-### PUT /api/projects/:id/activate
-Активировать проект
-
-**Параметры:**
-- `id` - UUID проекта
-
-**Ответ:**
-```json
-{
-  "id": "uuid-123",
-  "name": "Activated Project",
-  "isActive": true,
-  "lastAccessed": "2023-01-01T00:00:00.000Z",
-  "..."
-}
-```
-
 ### DELETE /api/projects/:id
 Удалить проект
 
@@ -187,12 +155,6 @@ curl -X POST http://localhost:3000/api/projects \
 
 ```bash
 curl http://localhost:3000/api/projects
-```
-
-### Активация проекта
-
-```bash
-curl -X PUT http://localhost:3000/api/projects/uuid-123/activate
 ```
 
 ### Удаление проекта
@@ -264,7 +226,6 @@ interface CreateProjectRequest {
 
 - ✅ Создание локальных проектов
 - ✅ Клонирование Git репозиториев
-- ✅ Активация/деактивация проектов
 - ✅ Удаление проектов
 - ✅ Статистика проектов
 - ✅ Валидация данных

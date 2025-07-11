@@ -10,10 +10,12 @@ import { setupWebSocketRoutes } from './websocket/websocket-handler';
 import { setupFileRoutes } from './routes/file-routes';
 import { setupChatRoutes } from './routes/chat-routes';
 import { setupProjectRoutes } from './routes/project-routes';
+import { setupProjectFileRoutes } from './routes/project-file-routes';
 import { errorHandler } from './middleware/error-handler';
 import { logger } from './utils/logger';
 import { AppConfig } from './config/app-config';
 import { ProjectService } from './services/project-service';
+import { ProjectChatService } from './services/project-chat-service';
 
 // Загружаем переменные окружения
 dotenv.config();
@@ -24,6 +26,7 @@ const server = createServer(app);
 
 // Инициализация сервисов
 const projectService = new ProjectService(config.workspaceDir);
+const projectChatService = new ProjectChatService(projectService);
 
 // Middleware
 app.use(helmet());
@@ -42,8 +45,9 @@ app.use((req, res, next) => {
 });
 
 // Маршруты API
-app.use('/api/files', setupFileRoutes());
-app.use('/api/chat', setupChatRoutes());
+app.use('/api/files', setupProjectFileRoutes(projectChatService)); // Project-aware файлы (приоритет)
+app.use('/api/files', setupFileRoutes()); // Fallback для общих файлов
+app.use('/api/chat', setupChatRoutes(projectChatService)); // Project-aware чаты
 app.use('/api/projects', setupProjectRoutes(projectService));
 
 // Проверка здоровья сервера

@@ -89,41 +89,6 @@ describe('Project Routes', () => {
     });
   });
 
-  describe('GET /api/projects/active', () => {
-    it('должен вернуть активный проект', async () => {
-      const mockActiveProject = {
-        id: '1',
-        name: 'Active Project',
-        path: '/path/to/active',
-        type: 'local',
-        createdAt: new Date(),
-        lastAccessed: new Date(),
-        isActive: true
-      } as Project;
-
-      mockProjectService.getActiveProject.mockReturnValue(mockActiveProject);
-
-      const response = await request(app)
-        .get('/api/projects/active')
-        .expect(200);
-
-      expect(response.body).toEqual(expect.objectContaining({
-        id: '1',
-        name: 'Active Project'
-      }));
-    });
-
-    it('должен вернуть 404 если нет активного проекта', async () => {
-      mockProjectService.getActiveProject.mockReturnValue(undefined);
-
-      const response = await request(app)
-        .get('/api/projects/active')
-        .expect(404);
-
-      expect(response.body.error).toBe('Активный проект не найден');
-    });
-  });
-
   describe('GET /api/projects/:id', () => {
     it('должен вернуть проект по ID', async () => {
       const mockProject = {
@@ -266,41 +231,6 @@ describe('Project Routes', () => {
         .expect(500);
 
       expect(response.body.error).toBe('Ошибка создания проекта: Creation failed');
-    });
-  });
-
-  describe('PUT /api/projects/:id/activate', () => {
-    it('должен активировать проект', async () => {
-      const mockActivatedProject = {
-        id: '1',
-        name: 'Activated Project',
-        path: '/path/to/activated',
-        type: 'local',
-        createdAt: new Date(),
-        lastAccessed: new Date(),
-        isActive: true
-      } as Project;
-
-      mockProjectService.activateProject.mockResolvedValue(mockActivatedProject);
-
-      const response = await request(app)
-        .put('/api/projects/1/activate')
-        .expect(200);
-
-      expect(response.body).toEqual(expect.objectContaining({
-        id: '1',
-        isActive: true
-      }));
-    });
-
-    it('должен обработать ошибку активации несуществующего проекта', async () => {
-      mockProjectService.activateProject.mockRejectedValue(new Error('Project not found'));
-
-      const response = await request(app)
-        .put('/api/projects/nonexistent/activate')
-        .expect(500);
-
-      expect(response.body.error).toBe('Ошибка активации проекта: Project not found');
     });
   });
 

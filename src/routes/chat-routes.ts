@@ -10,39 +10,56 @@ import {
   asyncHandler, 
   ValidationError 
 } from '../middleware/error-handler';
+import { ProjectChatService } from '../services/project-chat-service';
 
 // Простое хранилище сессий в памяти (в продакшене используйте Redis)
 const sessions = new Map<string, Session>();
 const chatHistory = new Map<string, ChatMessage[]>();
 
-export const setupChatRoutes = (): Router => {
+export const setupChatRoutes = (projectChatService?: ProjectChatService): Router => {
   const router = Router();
 
   // POST /api/chat/sessions - создать новую сессию
   router.post('/sessions', asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const { userId } = req.body;
+    const { userId, projectId } = req.body;
     
     const sessionId = uuidv4();
     const conversationId = uuidv4();
     
-    const session: Session = {
-      id: sessionId,
-      userId: userId || 'anonymous',
-      conversationId,
-      createdAt: new Date(),
-      lastActivity: new Date(),
-      isActive: true
-    };
+    // Создаем сессию с привязкой к проекту если сервис доступен
+    let session: Session;
+    if (projectChatService && projectId) {
+      const projectSession = await projectChatService.createProjectSession(projectId, userId || 'anonymous', conversationId);
+      if (projectSession) {
+        session = { ...projectSession, id: sessionId };
+      } else {
+        throw new ValidationError('Project not found', 'project');
+      }
+    } else {
+      session = {
+        id: sessionId,
+        userId: userId || 'anonymous',
+        conversationId,
+        createdAt: new Date(),
+        lastActivity: new Date(),
+        isActive: true
+      };
+    }
 
     sessions.set(sessionId, session);
     chatHistory.set(conversationId, []);
 
-    logger.info('New chat session created', { sessionId, conversationId, userId });
+    logger.info('New chat session created', { 
+      sessionId, 
+      conversationId, 
+      userId,
+      projectId: session.projectId 
+    });
 
     const response: ApiResponse<Session> = {
       success: true,
       data: session,
-      message: 'Session created successfully',
+      message: session.projectId ? 'Project session created successfully' : 'Session created successfully',
       timestamp: new Date().toISOString()
     };
 

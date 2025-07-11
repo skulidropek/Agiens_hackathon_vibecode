@@ -1,6 +1,7 @@
 import util from 'util';
 
 export enum LogLevel {
+  SILENT = -1,
   ERROR = 0,
   WARN = 1,
   INFO = 2,
@@ -68,6 +69,7 @@ export class Logger {
 
 // Создаем глобальный экземпляр логгера
 const logLevelMap: { [key: string]: LogLevel } = {
+  silent: LogLevel.SILENT,
   error: LogLevel.ERROR,
   warn: LogLevel.WARN,
   info: LogLevel.INFO,

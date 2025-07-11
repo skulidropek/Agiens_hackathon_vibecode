@@ -20,7 +20,7 @@ describe('AppConfig', () => {
       expect(config.port).toBe(3000);
       expect(config.host).toBe('localhost');
       expect(config.nodeEnv).toBe('test'); // В тестовом окружении NODE_ENV='test'
-      expect(config.logLevel).toBe('error'); // В тестовом окружении LOG_LEVEL='error'
+      expect(config.logLevel).toBe('silent'); // В тестовом окружении LOG_LEVEL='silent'
     });
 
     it('should use env variables when they are set', () => {
