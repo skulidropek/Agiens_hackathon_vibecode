@@ -9,9 +9,11 @@ import dotenv from 'dotenv';
 import { setupWebSocketRoutes } from './websocket/websocket-handler';
 import { setupFileRoutes } from './routes/file-routes';
 import { setupChatRoutes } from './routes/chat-routes';
+import { setupProjectRoutes } from './routes/project-routes';
 import { errorHandler } from './middleware/error-handler';
 import { logger } from './utils/logger';
 import { AppConfig } from './config/app-config';
+import { ProjectService } from './services/project-service';
 
 // Загружаем переменные окружения
 dotenv.config();
@@ -19,6 +21,9 @@ dotenv.config();
 const config = new AppConfig();
 const app = express();
 const server = createServer(app);
+
+// Инициализация сервисов
+const projectService = new ProjectService(config.workspaceDir);
 
 // Middleware
 app.use(helmet());
@@ -39,6 +44,7 @@ app.use((req, res, next) => {
 // Маршруты API
 app.use('/api/files', setupFileRoutes());
 app.use('/api/chat', setupChatRoutes());
+app.use('/api/projects', setupProjectRoutes(projectService));
 
 // Проверка здоровья сервера
 app.get('/health', (req, res) => {
