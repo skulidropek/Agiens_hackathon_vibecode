@@ -5,6 +5,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import dotenv from 'dotenv';
+import swaggerUi from 'swagger-ui-express';
+import swaggerJSDoc from 'swagger-jsdoc';
 
 import { setupWebSocketRoutes } from './websocket/websocket-handler';
 import { setupFileRoutes } from './routes/file-routes';
@@ -28,6 +30,23 @@ const config = new AppConfig();
 const app = express();
 const server = createServer(app);
 
+// Swagger/OpenAPI конфиг (после config)
+const swaggerOptions = {
+  definition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'AI Coding Platform API',
+      version: '1.0.0',
+      description: 'Документация REST API для фронтенда',
+    },
+    servers: [
+      { url: `http://${config.host}:${config.port}`, description: 'Local server' }
+    ],
+  },
+  apis: ['./src/routes/*.ts'], // JSDoc-аннотации в роутерах
+};
+const swaggerSpec = swaggerJSDoc(swaggerOptions);
+
 // Инициализация сервисов
 const projectService = new ProjectService(config.workspaceDir);
 const projectChatService = new ProjectChatService(projectService);
@@ -49,6 +68,10 @@ app.use((req, res, next) => {
   logger.info(`${req.method} ${req.path} - ${req.ip}`);
   next();
 });
+
+// Swagger UI должен быть ДО всех API-роутов
+// @ts-ignore
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Маршруты API
 app.use('/api/files', setupProjectFileRoutes(projectChatService)); // Project-aware файлы (приоритет)
