@@ -144,7 +144,7 @@ export class Api<
    * @summary Получить список всех сессий
    * @request GET:/api/chat/sessions
    */
-  chatSessionsList = (params: RequestParams = {}) =>
+  chatSessionsList = (params: Requestimage.pngParams = {}) =>
     this.request<void, any>({
       path: `/api/chat/sessions`,
       method: "GET",

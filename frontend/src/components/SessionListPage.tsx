@@ -2,12 +2,28 @@ import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { Api } from "../api/Api";
 
+// Тип Session (минимальный для списка)
+type Session = {
+  id: string;
+  title?: string;
+  isActive?: boolean;
+  lastActivity?: string;
+};
+
+// Тип для передачи query-параметров в chatSessionsList
+interface ChatSessionsListParams {
+  query: { projectId: string };
+}
+
 const SessionListPage: React.FC = () => {
   const navigate = useNavigate();
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState<boolean>(false);
+  const [sessionsError, setSessionsError] = useState<string>("");
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -27,6 +43,38 @@ const SessionListPage: React.FC = () => {
     };
     fetchProjects();
   }, []);
+
+  useEffect(() => {
+    if (!selectedProject) return;
+    setSessionsLoading(true);
+    setSessionsError("");
+    const fetchSessions = async () => {
+      try {
+        const api = new Api();
+        console.log('Selected projectId:', selectedProject);
+        const params: ChatSessionsListParams = { query: { projectId: selectedProject } };
+        console.log('Request params:', params);
+        const res = await api.chatSessionsList(params as unknown as Parameters<typeof api.chatSessionsList>[0]);
+        let json: { data?: Session[] } | undefined;
+        if (typeof res.json === 'function') {
+          json = await res.json();
+          console.log('Parsed JSON:', json);
+        } else {
+          console.log('API response:', res);
+          json = res as { data?: Session[] };
+        }
+        const sessionsArr = json?.data;
+        setSessions(Array.isArray(sessionsArr) ? sessionsArr : []);
+      } catch (err) {
+        console.error('API error:', err);
+        setSessionsError("Ошибка загрузки сессий");
+        setSessions([]);
+      } finally {
+        setSessionsLoading(false);
+      }
+    };
+    fetchSessions();
+  }, [selectedProject]);
 
   return (
     <div className="codex-main flex flex-col items-center">
@@ -74,8 +122,23 @@ const SessionListPage: React.FC = () => {
       <section className="codex-task-list-section w-full max-w-md">
         <h2 className="codex-task-list-title text-lg font-semibold text-gray-500 mb-4">Sessions</h2>
         <div className="codex-task-list flex flex-col gap-3">
-          {/* Здесь будет список сессий из API */}
-          <div className="codex-task-card bg-white rounded-xl shadow p-4 font-medium cursor-pointer hover:bg-blue-50" onClick={() => navigate("/chat/demo-session")}>Demo session (click to open)</div>
+          {sessionsLoading ? (
+            <div className="text-gray-400">Загрузка сессий...</div>
+          ) : sessionsError ? (
+            <div className="text-red-500">{sessionsError}</div>
+          ) : sessions.length === 0 ? (
+            <div className="text-gray-400">Нет сессий</div>
+          ) : (
+            sessions.map((s) => (
+              <div
+                key={s.id}
+                className="codex-task-card bg-white rounded-xl shadow p-4 font-medium cursor-pointer hover:bg-blue-50"
+                onClick={() => navigate(`/chat/${s.id}`, { state: { projectId: selectedProject } })}
+              >
+                {s.title || s.id}
+              </div>
+            ))
+          )}
         </div>
       </section>
     </div>
