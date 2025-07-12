@@ -175,5 +175,42 @@ export function setupAIRoutes(aiService: AIService) {
     }
   });
 
+  // Очистка кэша AI сервиса
+  router.post('/cache/clear', async (req: Request, res: Response) => {
+    try {
+      aiService.clearCache();
+      res.json({
+        success: true,
+        message: 'Кэш AI сервиса успешно очищен',
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
+  // Получение информации о кэше
+  router.get('/cache/info', async (req: Request, res: Response) => {
+    try {
+      const health = await aiService.getHealth();
+      res.json({
+        success: true,
+        cacheSize: health.cacheSize,
+        status: health.status,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
   return router;
 } 

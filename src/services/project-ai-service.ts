@@ -1,7 +1,8 @@
 import { AIService, AIServiceOptions, AIResponse, AIStreamEvent } from './ai-service';
 import { ProjectService } from './project-service';
 import { logger } from '../utils/logger';
-import path from 'path';
+import { PathManager } from '../utils/path-manager';
+import { RetryUtils } from '../utils/retry-utils';
 
 export interface ProjectAIOptions {
   projectId: string;
@@ -28,7 +29,7 @@ export class ProjectAIService {
         throw new Error(`Проект с ID ${options.projectId} не найден`);
       }
 
-      const projectPath = path.join(this.projectService.getProjectsDirectory(), project.name);
+      const projectPath = PathManager.getProjectPath(project.name);
       
       const aiOptions: AIServiceOptions = {
         sessionId: options.sessionId || `project-${options.projectId}-${Date.now()}`,
@@ -58,21 +59,25 @@ export class ProjectAIService {
         };
       }
 
-      const projectPath = path.join(this.projectService.getProjectsDirectory(), project.name);
+      const projectPath = PathManager.getProjectPath(project.name);
       
       const aiOptions = {
         projectPath,
         fullContext: options.fullContext || false,
         model: options.model,
         debugMode: options.debugMode || false,
+        sessionId: options.sessionId || `project-${options.projectId}-${Date.now()}`,
       };
 
-      return await this.aiService.processMessage(message, aiOptions);
+      return await RetryUtils.executeWithRetry(
+        () => this.aiService.processMessage(message, aiOptions),
+        { maxRetries: 2 }
+      );
     } catch (error) {
       logger.error('Error in Project AI Service processMessage:', error instanceof Error ? error.message : String(error));
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : String(error),
         timestamp: new Date().toISOString(),
       };
     }
@@ -91,13 +96,14 @@ export class ProjectAIService {
         return;
       }
 
-      const projectPath = path.join(this.projectService.getProjectsDirectory(), project.name);
+      const projectPath = PathManager.getProjectPath(project.name);
       
       const aiOptions = {
         projectPath,
         fullContext: options.fullContext || false,
         model: options.model,
         debugMode: options.debugMode || false,
+        sessionId: options.sessionId || `project-${options.projectId}-${Date.now()}`,
       };
 
       yield* this.aiService.processMessageStream(message, aiOptions);
@@ -106,12 +112,12 @@ export class ProjectAIService {
       yield {
         type: 'error',
         timestamp: new Date().toISOString(),
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : String(error)
       };
     }
   }
 
-  async getHealth(projectId: string): Promise<{ status: string; model: string; initialized: boolean; project?: import('../types/project').Project | undefined }> {
+  async getHealth(projectId: string): Promise<{ status: string; model: string; initialized: boolean; project?: import('../types/project').Project | undefined; cacheSize: number }> {
     try {
       const project = await this.projectService.getProject(projectId);
       const health = await this.aiService.getHealth();
@@ -125,12 +131,13 @@ export class ProjectAIService {
       return {
         status: 'error',
         model: 'unknown',
-        initialized: false
+        initialized: false,
+        cacheSize: 0
       };
     }
   }
 
-  async getConfig(projectId: string): Promise<{ model: string; working_directory: string; project?: import('../types/project').Project | undefined; supported_options: Record<string, string> }> {
+  async getConfig(projectId: string): Promise<{ model: string; working_directory: string; project?: import('../types/project').Project | undefined; supported_options: Record<string, string>; cacheInfo: { size: number; ttl: number } }> {
     try {
       const project = await this.projectService.getProject(projectId);
       const config = await this.aiService.getConfig();
@@ -144,8 +151,16 @@ export class ProjectAIService {
       return {
         model: 'unknown',
         working_directory: 'unknown',
-        supported_options: {}
+        supported_options: {},
+        cacheInfo: { size: 0, ttl: 0 }
       };
     }
+  }
+
+  /**
+   * Очистка кэша AI сервиса
+   */
+  clearCache(): void {
+    this.aiService.clearCache();
   }
 } 

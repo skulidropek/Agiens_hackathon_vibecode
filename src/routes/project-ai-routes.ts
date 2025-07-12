@@ -214,5 +214,33 @@ export function setupProjectAIRoutes(projectAIService: ProjectAIService) {
     }
   });
 
+  // Очистка кэша AI сервиса для проекта
+  router.post('/:projectId/cache/clear', async (req: Request, res: Response) => {
+    try {
+      const { projectId } = req.params;
+      
+      if (!projectId) {
+        return res.status(400).json({
+          success: false,
+          error: 'projectId обязателен',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      projectAIService.clearCache();
+      res.json({
+        success: true,
+        message: `Кэш AI сервиса для проекта ${projectId} успешно очищен`,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
   return router;
 } 
