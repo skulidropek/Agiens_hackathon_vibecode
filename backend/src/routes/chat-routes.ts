@@ -153,4 +153,4 @@ export const setupChatRoutes = (projectChatService: ProjectChatService): Router 
   }));
 
   return router;
-}; 
+};
