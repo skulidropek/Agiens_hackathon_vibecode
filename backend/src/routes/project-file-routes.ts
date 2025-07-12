@@ -20,7 +20,49 @@ import {
 export function setupProjectFileRoutes(projectChatService: ProjectChatService): Router {
   const router = Router();
 
-  // GET /api/files/project/:projectId - получить файлы проекта
+  /**
+ * @openapi
+ * /api/files/project/{projectId}:
+ *   get:
+ *     summary: Получить список файлов проекта
+ *     tags:
+ *       - ProjectFiles
+ *     parameters:
+ *       - in: path
+ *         name: projectId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID проекта
+ *       - in: query
+ *         name: recursive
+ *         schema:
+ *           type: boolean
+ *         description: Рекурсивно искать файлы
+ *       - in: query
+ *         name: filter
+ *         schema:
+ *           type: string
+ *         description: Фильтр по имени файла
+ *     responses:
+ *       200:
+ *         description: Список файлов проекта
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/FileInfo'
+ *                 message:
+ *                   type: string
+ *                 timestamp:
+ *                   type: string
+ */
   router.get('/project/:projectId', asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { projectId } = req.params;
     const { recursive = 'false', filter } = req.query;
@@ -50,7 +92,45 @@ export function setupProjectFileRoutes(projectChatService: ProjectChatService): 
     res.json(response);
   }));
 
-  // GET /api/files/project/:projectId/:path - получить содержимое файла из проекта
+  /**
+ * @openapi
+ * /api/files/project/{projectId}/{path}:
+ *   get:
+ *     summary: Получить содержимое файла или директории в проекте
+ *     tags:
+ *       - ProjectFiles
+ *     parameters:
+ *       - in: path
+ *         name: projectId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID проекта
+ *       - in: path
+ *         name: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Путь к файлу или директории
+ *     responses:
+ *       200:
+ *         description: Содержимое файла или список файлов в директории
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   oneOf:
+ *                     - $ref: '#/components/schemas/FileContent'
+ *                     - type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/FileInfo'
+ *                 timestamp:
+ *                   type: string
+ */
   router.get('/project/:projectId/:path(*)', asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { projectId } = req.params;
     const relativePath = req.params.path;
@@ -109,7 +189,55 @@ export function setupProjectFileRoutes(projectChatService: ProjectChatService): 
     }
   }));
 
-  // POST /api/files/project/:projectId/:path - создать или обновить файл в проекте
+  /**
+ * @openapi
+ * /api/files/project/{projectId}/{path}:
+ *   post:
+ *     summary: Создать или обновить файл в проекте
+ *     tags:
+ *       - ProjectFiles
+ *     parameters:
+ *       - in: path
+ *         name: projectId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID проекта
+ *       - in: path
+ *         name: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Путь к файлу
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               content:
+ *                 type: string
+ *               encoding:
+ *                 type: string
+ *                 default: utf-8
+ *     responses:
+ *       200:
+ *         description: Файл создан или обновлен в проекте
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   $ref: '#/components/schemas/FileInfo'
+ *                 message:
+ *                   type: string
+ *                 timestamp:
+ *                   type: string
+ */
   router.post('/project/:projectId/:path(*)', asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { projectId } = req.params;
     const relativePath = req.params.path;
@@ -165,7 +293,43 @@ export function setupProjectFileRoutes(projectChatService: ProjectChatService): 
     res.json(response);
   }));
 
-  // DELETE /api/files/project/:projectId/:path - удалить файл из проекта
+  /**
+ * @openapi
+ * /api/files/project/{projectId}/{path}:
+ *   delete:
+ *     summary: Удалить файл или директорию в проекте
+ *     tags:
+ *       - ProjectFiles
+ *     parameters:
+ *       - in: path
+ *         name: projectId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID проекта
+ *       - in: path
+ *         name: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Путь к файлу или директории
+ *     responses:
+ *       200:
+ *         description: Файл или директория удалены из проекта
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: 'null'
+ *                 message:
+ *                   type: string
+ *                 timestamp:
+ *                   type: string
+ */
   router.delete('/project/:projectId/:path(*)', asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { projectId } = req.params;
     const relativePath = req.params.path;
@@ -206,7 +370,35 @@ export function setupProjectFileRoutes(projectChatService: ProjectChatService): 
     }
   }));
 
-  // GET /api/files/project/:projectId/stats - получить статистику проекта
+  /**
+ * @openapi
+ * /api/files/project/{projectId}/stats:
+ *   get:
+ *     summary: Получить статистику проекта
+ *     tags:
+ *       - ProjectFiles
+ *     parameters:
+ *       - in: path
+ *         name: projectId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID проекта
+ *     responses:
+ *       200:
+ *         description: Статистика проекта
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                 timestamp:
+ *                   type: string
+ */
   router.get('/project/:projectId/stats', asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { projectId } = req.params;
     const stats = await projectChatService.getProjectStats(projectId);

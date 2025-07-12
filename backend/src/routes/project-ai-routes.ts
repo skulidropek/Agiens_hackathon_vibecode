@@ -5,7 +5,30 @@ import { logger } from '../utils/logger';
 export function setupProjectAIRoutes(projectAIService: ProjectAIService) {
   const router = Router();
 
-  // Инициализация AI сервиса для проекта
+  /**
+   * @openapi
+   * /api/projects/{projectId}/init:
+   *   post:
+   *     summary: Инициализация AI сервиса для проекта
+   *     tags:
+   *       - ProjectAI
+   *     parameters:
+   *       - in: path
+   *         name: projectId
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: ID проекта
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *     responses:
+   *       200:
+   *         description: AI сервис инициализирован
+   */
   router.post('/:projectId/init', async (req: Request, res: Response) => {
     try {
       const { projectId } = req.params;
@@ -37,7 +60,30 @@ export function setupProjectAIRoutes(projectAIService: ProjectAIService) {
     }
   });
 
-  // Чат с AI в контексте проекта
+  /**
+   * @openapi
+   * /api/projects/{projectId}/chat:
+   *   post:
+   *     summary: Чат с AI в контексте проекта
+   *     tags:
+   *       - ProjectAI
+   *     parameters:
+   *       - in: path
+   *         name: projectId
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: ID проекта
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *     responses:
+   *       200:
+   *         description: Ответ AI
+   */
   router.post('/:projectId/chat', async (req: Request, res: Response) => {
     try {
       const { projectId } = req.params;
@@ -97,7 +143,30 @@ export function setupProjectAIRoutes(projectAIService: ProjectAIService) {
     }
   });
 
-  // Стриминг чата с AI в контексте проекта
+  /**
+   * @openapi
+   * /api/projects/{projectId}/chat/stream:
+   *   post:
+   *     summary: Стриминг чата с AI в контексте проекта
+   *     tags:
+   *       - ProjectAI
+   *     parameters:
+   *       - in: path
+   *         name: projectId
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: ID проекта
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *     responses:
+   *       200:
+   *         description: Стриминг ответов AI
+   */
   router.post('/:projectId/chat/stream', async (req: Request, res: Response) => {
     try {
       const { projectId } = req.params;
@@ -158,7 +227,24 @@ export function setupProjectAIRoutes(projectAIService: ProjectAIService) {
     }
   });
 
-  // Проверка здоровья AI сервиса для проекта
+  /**
+   * @openapi
+   * /api/projects/{projectId}/health:
+   *   get:
+   *     summary: Проверка здоровья AI сервиса для проекта
+   *     tags:
+   *       - ProjectAI
+   *     parameters:
+   *       - in: path
+   *         name: projectId
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: ID проекта
+   *     responses:
+   *       200:
+   *         description: Статус AI сервиса
+   */
   router.get('/:projectId/health', async (req: Request, res: Response) => {
     try {
       const { projectId } = req.params;
@@ -186,7 +272,24 @@ export function setupProjectAIRoutes(projectAIService: ProjectAIService) {
     }
   });
 
-  // Получение конфигурации AI сервиса для проекта
+  /**
+   * @openapi
+   * /api/projects/{projectId}/config:
+   *   get:
+   *     summary: Получение конфигурации AI сервиса для проекта
+   *     tags:
+   *       - ProjectAI
+   *     parameters:
+   *       - in: path
+   *         name: projectId
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: ID проекта
+   *     responses:
+   *       200:
+   *         description: Конфигурация AI сервиса
+   */
   router.get('/:projectId/config', async (req: Request, res: Response) => {
     try {
       const { projectId } = req.params;
@@ -214,7 +317,24 @@ export function setupProjectAIRoutes(projectAIService: ProjectAIService) {
     }
   });
 
-  // Очистка кэша AI сервиса для проекта
+  /**
+   * @openapi
+   * /api/projects/{projectId}/cache/clear:
+   *   post:
+   *     summary: Очистка кэша AI сервиса для проекта
+   *     tags:
+   *       - ProjectAI
+   *     parameters:
+   *       - in: path
+   *         name: projectId
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: ID проекта
+   *     responses:
+   *       200:
+   *         description: Кэш очищен
+   */
   router.post('/:projectId/cache/clear', async (req: Request, res: Response) => {
     try {
       const { projectId } = req.params;

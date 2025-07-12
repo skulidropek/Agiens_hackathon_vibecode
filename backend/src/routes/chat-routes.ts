@@ -23,7 +23,7 @@ export const setupChatRoutes = (projectChatService?: ProjectChatService): Router
    * @openapi
    * /api/chat/sessions:
    *   post:
-   *     summary: Создать новую сессию чата
+   *     summary: Создать новую чат-сессию
    *     tags:
    *       - Chat
    *     requestBody:
@@ -32,18 +32,11 @@ export const setupChatRoutes = (projectChatService?: ProjectChatService): Router
    *         application/json:
    *           schema:
    *             type: object
-   *             properties:
-   *               userId:
-   *                 type: string
-   *                 description: ID пользователя
-   *               projectId:
-   *                 type: string
-   *                 description: ID проекта (опционально)
    *     responses:
    *       200:
-   *         description: Сессия успешно создана
+   *         description: Сессия создана
    */
-  // POST /api/chat/sessions - создать новую сессию
+  // POST /api/chat/sessions - создать сессию
   router.post('/sessions', asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { userId, projectId } = req.body;
     
@@ -92,23 +85,61 @@ export const setupChatRoutes = (projectChatService?: ProjectChatService): Router
 
   /**
    * @openapi
-   * /api/chat/sessions/{sessionId}:
+   * /api/chat/sessions:
    *   get:
-   *     summary: Получить информацию о сессии
+   *     summary: Получить список всех сессий
+   *     tags:
+   *       - Chat
+   *     responses:
+   *       200:
+   *         description: Список сессий
+   */
+  // GET /api/chat/sessions - получить все сессии
+  router.get('/sessions', asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { userId, active = 'true' } = req.query;
+    const isActiveFilter = active === 'true';
+
+    let filteredSessions = Array.from(sessions.values());
+
+    if (userId) {
+      filteredSessions = filteredSessions.filter(session => session.userId === userId);
+    }
+
+    if (isActiveFilter) {
+      filteredSessions = filteredSessions.filter(session => session.isActive);
+    }
+
+    // Сортируем по последней активности
+    filteredSessions.sort((a, b) => b.lastActivity.getTime() - a.lastActivity.getTime());
+
+    const response: ApiResponse<Session[]> = {
+      success: true,
+      data: filteredSessions,
+      timestamp: new Date().toISOString()
+    };
+
+    res.json(response);
+  }));
+
+  /**
+   * @openapi
+   * /api/chat/sessions/{id}:
+   *   get:
+   *     summary: Получить сессию по ID
    *     tags:
    *       - Chat
    *     parameters:
    *       - in: path
-   *         name: sessionId
+   *         name: id
    *         required: true
    *         schema:
    *           type: string
    *         description: ID сессии
    *     responses:
    *       200:
-   *         description: Информация о сессии
+   *         description: Сессия
    */
-  // GET /api/chat/sessions/:sessionId - получить информацию о сессии
+  // GET /api/chat/sessions/:id - получить сессию по ID
   router.get('/sessions/:sessionId', asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { sessionId } = req.params;
 
@@ -124,6 +155,53 @@ export const setupChatRoutes = (projectChatService?: ProjectChatService): Router
     const response: ApiResponse<Session> = {
       success: true,
       data: session,
+      timestamp: new Date().toISOString()
+    };
+
+    res.json(response);
+  }));
+
+  /**
+   * @openapi
+   * /api/chat/sessions/{id}:
+   *   delete:
+   *     summary: Удалить сессию по ID
+   *     tags:
+   *       - Chat
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: ID сессии
+   *     responses:
+   *       200:
+   *         description: Сессия удалена
+   */
+  // DELETE /api/chat/sessions/:id - удалить сессию
+  router.delete('/sessions/:sessionId', asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { sessionId } = req.params;
+
+    if (!sessionId) {
+      throw new ValidationError('Session ID is required', 'sessionId');
+    }
+
+    const session = sessions.get(sessionId);
+    if (!session) {
+      throw new ValidationError('Session not found', 'sessionId', sessionId);
+    }
+
+    // Помечаем сессию как неактивную
+    session.isActive = false;
+    sessions.set(sessionId, session);
+
+    logger.info('Chat session ended', { sessionId });
+
+    const response: ApiResponse<null> = {
+      success: true,
+      data: null,
+      message: 'Session ended successfully',
       timestamp: new Date().toISOString()
     };
 
@@ -193,102 +271,6 @@ export const setupChatRoutes = (projectChatService?: ProjectChatService): Router
         limit: limitNum,
         offset: offsetNum
       },
-      timestamp: new Date().toISOString()
-    };
-
-    res.json(response);
-  }));
-
-  /**
-   * @openapi
-   * /api/chat/sessions/{sessionId}:
-   *   delete:
-   *     summary: Завершить сессию чата
-   *     tags:
-   *       - Chat
-   *     parameters:
-   *       - in: path
-   *         name: sessionId
-   *         required: true
-   *         schema:
-   *           type: string
-   *         description: ID сессии
-   *     responses:
-   *       200:
-   *         description: Сессия завершена
-   */
-  // DELETE /api/chat/sessions/:sessionId - завершить сессию
-  router.delete('/sessions/:sessionId', asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const { sessionId } = req.params;
-
-    if (!sessionId) {
-      throw new ValidationError('Session ID is required', 'sessionId');
-    }
-
-    const session = sessions.get(sessionId);
-    if (!session) {
-      throw new ValidationError('Session not found', 'sessionId', sessionId);
-    }
-
-    // Помечаем сессию как неактивную
-    session.isActive = false;
-    sessions.set(sessionId, session);
-
-    logger.info('Chat session ended', { sessionId });
-
-    const response: ApiResponse<null> = {
-      success: true,
-      data: null,
-      message: 'Session ended successfully',
-      timestamp: new Date().toISOString()
-    };
-
-    res.json(response);
-  }));
-
-  /**
-   * @openapi
-   * /api/chat/sessions:
-   *   get:
-   *     summary: Получить список активных сессий
-   *     tags:
-   *       - Chat
-   *     parameters:
-   *       - in: query
-   *         name: userId
-   *         schema:
-   *           type: string
-   *         description: ID пользователя (фильтр)
-   *       - in: query
-   *         name: active
-   *         schema:
-   *           type: boolean
-   *         description: Только активные (по умолчанию true)
-   *     responses:
-   *       200:
-   *         description: Список сессий
-   */
-  // GET /api/chat/sessions - получить список активных сессий
-  router.get('/sessions', asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const { userId, active = 'true' } = req.query;
-    const isActiveFilter = active === 'true';
-
-    let filteredSessions = Array.from(sessions.values());
-
-    if (userId) {
-      filteredSessions = filteredSessions.filter(session => session.userId === userId);
-    }
-
-    if (isActiveFilter) {
-      filteredSessions = filteredSessions.filter(session => session.isActive);
-    }
-
-    // Сортируем по последней активности
-    filteredSessions.sort((a, b) => b.lastActivity.getTime() - a.lastActivity.getTime());
-
-    const response: ApiResponse<Session[]> = {
-      success: true,
-      data: filteredSessions,
       timestamp: new Date().toISOString()
     };
 

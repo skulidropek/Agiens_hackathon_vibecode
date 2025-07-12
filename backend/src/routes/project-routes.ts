@@ -9,7 +9,28 @@ export function setupProjectRoutes(projectServiceInstance: ProjectService): Rout
   projectService = projectServiceInstance;
   const router = Router();
 
-  // GET /api/projects - Получить список всех проектов
+  /**
+   * @openapi
+   * /api/projects:
+   *   get:
+   *     summary: Получить список всех проектов
+   *     tags:
+   *       - Projects
+   *     responses:
+   *       200:
+   *         description: Список проектов
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 projects:
+   *                   type: array
+   *                   items:
+   *                     $ref: '#/components/schemas/Project'
+   *                 activeProject:
+   *                   $ref: '#/components/schemas/Project'
+   */
   router.get('/', async (req: Request, res: Response) => {
     try {
       const projectList = await projectService.listProjects();
@@ -21,7 +42,30 @@ export function setupProjectRoutes(projectServiceInstance: ProjectService): Rout
     }
   });
 
-  // GET /api/projects/stats - Получить статистику проектов
+  /**
+   * @openapi
+   * /api/projects/stats:
+   *   get:
+   *     summary: Получить статистику проектов
+   *     tags:
+   *       - Projects
+   *     responses:
+   *       200:
+   *         description: Статистика проектов
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 totalProjects:
+   *                   type: integer
+   *                 gitProjects:
+   *                   type: integer
+   *                 localProjects:
+   *                   type: integer
+   *                 activeProject:
+   *                   type: string
+   */
   router.get('/stats', async (req: Request, res: Response) => {
     try {
       const stats = await projectService.getProjectStats();
@@ -33,7 +77,30 @@ export function setupProjectRoutes(projectServiceInstance: ProjectService): Rout
     }
   });
 
-  // GET /api/projects/:id - Получить конкретный проект
+  /**
+   * @openapi
+   * /api/projects/{id}:
+   *   get:
+   *     summary: Получить проект по ID
+   *     tags:
+   *       - Projects
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: ID проекта
+   *     responses:
+   *       200:
+   *         description: Проект
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/Project'
+   *       404:
+   *         description: Проект не найден
+   */
   router.get('/:id', async (req: Request, res: Response) => {
     try {
       const project = await projectService.getProject(req.params.id);
@@ -48,7 +115,29 @@ export function setupProjectRoutes(projectServiceInstance: ProjectService): Rout
     }
   });
 
-  // POST /api/projects - Создать новый проект
+  /**
+   * @openapi
+   * /api/projects:
+   *   post:
+   *     summary: Создать новый проект
+   *     tags:
+   *       - Projects
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/CreateProjectRequest'
+   *     responses:
+   *       201:
+   *         description: Проект создан
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/Project'
+   *       400:
+   *         description: Ошибка валидации
+   */
   router.post('/', async (req: Request, res: Response) => {
     try {
       const createRequest: CreateProjectRequest = req.body;
@@ -75,7 +164,26 @@ export function setupProjectRoutes(projectServiceInstance: ProjectService): Rout
     }
   });
 
-  // DELETE /api/projects/:id - Удалить проект
+  /**
+   * @openapi
+   * /api/projects/{id}:
+   *   delete:
+   *     summary: Удалить проект
+   *     tags:
+   *       - Projects
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: ID проекта
+   *     responses:
+   *       200:
+   *         description: Проект успешно удален
+   *       404:
+   *         description: Проект не найден
+   */
   router.delete('/:id', async (req: Request, res: Response) => {
     try {
       const deleted = await projectService.deleteProject(req.params.id);

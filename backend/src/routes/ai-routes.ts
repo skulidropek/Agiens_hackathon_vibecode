@@ -5,6 +5,23 @@ import { logger } from '../utils/logger';
 export function setupAIRoutes(aiService: AIService) {
   const router = Router();
 
+  /**
+   * @openapi
+   * /api/ai/init:
+   *   post:
+   *     summary: Инициализация AI сервиса
+   *     tags:
+   *       - AI
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *     responses:
+   *       200:
+   *         description: AI сервис инициализирован
+   */
   // Инициализация AI сервиса
   router.post('/init', async (req: Request, res: Response) => {
     try {
@@ -36,6 +53,23 @@ export function setupAIRoutes(aiService: AIService) {
     }
   });
 
+  /**
+   * @openapi
+   * /api/ai/chat:
+   *   post:
+   *     summary: Обычный чат с AI
+   *     tags:
+   *       - AI
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *     responses:
+   *       200:
+   *         description: Ответ AI
+   */
   // Обычный чат с AI
   router.post('/chat', async (req: Request, res: Response) => {
     try {
@@ -87,6 +121,23 @@ export function setupAIRoutes(aiService: AIService) {
     }
   });
 
+  /**
+   * @openapi
+   * /api/ai/chat/stream:
+   *   post:
+   *     summary: Стриминг чата с AI
+   *     tags:
+   *       - AI
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *     responses:
+   *       200:
+   *         description: Стриминг ответов AI
+   */
   // Стриминг чата с AI
   router.post('/chat/stream', async (req: Request, res: Response) => {
     try {
@@ -139,6 +190,17 @@ export function setupAIRoutes(aiService: AIService) {
     }
   });
 
+  /**
+   * @openapi
+   * /api/ai/health:
+   *   get:
+   *     summary: Проверка здоровья AI сервиса
+   *     tags:
+   *       - AI
+   *     responses:
+   *       200:
+   *         description: Статус AI сервиса
+   */
   // Проверка здоровья AI сервиса
   router.get('/health', async (req: Request, res: Response) => {
     try {
@@ -157,6 +219,17 @@ export function setupAIRoutes(aiService: AIService) {
     }
   });
 
+  /**
+   * @openapi
+   * /api/ai/config:
+   *   get:
+   *     summary: Получение конфигурации AI сервиса
+   *     tags:
+   *       - AI
+   *     responses:
+   *       200:
+   *         description: Конфигурация AI сервиса
+   */
   // Получение конфигурации AI сервиса
   router.get('/config', async (req: Request, res: Response) => {
     try {
@@ -175,6 +248,17 @@ export function setupAIRoutes(aiService: AIService) {
     }
   });
 
+  /**
+   * @openapi
+   * /api/ai/cache/clear:
+   *   post:
+   *     summary: Очистка кэша AI сервиса
+   *     tags:
+   *       - AI
+   *     responses:
+   *       200:
+   *         description: Кэш очищен
+   */
   // Очистка кэша AI сервиса
   router.post('/cache/clear', async (req: Request, res: Response) => {
     try {
@@ -193,6 +277,17 @@ export function setupAIRoutes(aiService: AIService) {
     }
   });
 
+  /**
+   * @openapi
+   * /api/ai/cache/info:
+   *   get:
+   *     summary: Получение информации о кэше AI
+   *     tags:
+   *       - AI
+   *     responses:
+   *       200:
+   *         description: Информация о кэше AI
+   */
   // Получение информации о кэше
   router.get('/cache/info', async (req: Request, res: Response) => {
     try {

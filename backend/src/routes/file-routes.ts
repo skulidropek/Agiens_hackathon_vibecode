@@ -22,7 +22,41 @@ const config = new AppConfig();
 export const setupFileRoutes = (): Router => {
   const router = Router();
 
-  // GET /api/files - получить список файлов
+  /**
+ * @openapi
+ * /api/files:
+ *   get:
+ *     summary: Получить список файлов в рабочей директории
+ *     tags:
+ *       - Files
+ *     parameters:
+ *       - in: query
+ *         name: recursive
+ *         schema:
+ *           type: boolean
+ *         description: Рекурсивно искать файлы
+ *       - in: query
+ *         name: filter
+ *         schema:
+ *           type: string
+ *         description: Фильтр по имени файла
+ *     responses:
+ *       200:
+ *         description: Список файлов
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/FileInfo'
+ *                 timestamp:
+ *                   type: string
+ */
   router.get('/', asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { recursive = 'false', filter } = req.query;
     const isRecursive = recursive === 'true';
@@ -45,7 +79,39 @@ export const setupFileRoutes = (): Router => {
     res.json(response);
   }));
 
-  // GET /api/files/:path - получить содержимое файла
+  /**
+ * @openapi
+ * /api/files/{path}:
+ *   get:
+ *     summary: Получить содержимое файла или директории
+ *     tags:
+ *       - Files
+ *     parameters:
+ *       - in: path
+ *         name: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Путь к файлу или директории
+ *     responses:
+ *       200:
+ *         description: Содержимое файла или список файлов в директории
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   oneOf:
+ *                     - $ref: '#/components/schemas/FileContent'
+ *                     - type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/FileInfo'
+ *                 timestamp:
+ *                   type: string
+ */
   router.get('/:path(*)', asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const relativePath = req.params.path;
     
@@ -104,7 +170,49 @@ export const setupFileRoutes = (): Router => {
     }
   }));
 
-  // POST /api/files/:path - создать или обновить файл
+  /**
+ * @openapi
+ * /api/files/{path}:
+ *   post:
+ *     summary: Создать или обновить файл
+ *     tags:
+ *       - Files
+ *     parameters:
+ *       - in: path
+ *         name: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Путь к файлу
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               content:
+ *                 type: string
+ *               encoding:
+ *                 type: string
+ *                 default: utf-8
+ *     responses:
+ *       200:
+ *         description: Файл создан или обновлен
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   $ref: '#/components/schemas/FileInfo'
+ *                 message:
+ *                   type: string
+ *                 timestamp:
+ *                   type: string
+ */
   router.post('/:path(*)', asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const relativePath = req.params.path;
     const { content, encoding = 'utf-8' } = req.body;
@@ -160,7 +268,37 @@ export const setupFileRoutes = (): Router => {
     res.json(response);
   }));
 
-  // DELETE /api/files/:path - удалить файл
+  /**
+ * @openapi
+ * /api/files/{path}:
+ *   delete:
+ *     summary: Удалить файл или директорию
+ *     tags:
+ *       - Files
+ *     parameters:
+ *       - in: path
+ *         name: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Путь к файлу или директории
+ *     responses:
+ *       200:
+ *         description: Файл или директория удалены
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: 'null'
+ *                 message:
+ *                   type: string
+ *                 timestamp:
+ *                   type: string
+ */
   router.delete('/:path(*)', asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const relativePath = req.params.path;
 
