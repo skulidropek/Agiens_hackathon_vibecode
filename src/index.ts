@@ -11,11 +11,15 @@ import { setupFileRoutes } from './routes/file-routes';
 import { setupChatRoutes } from './routes/chat-routes';
 import { setupProjectRoutes } from './routes/project-routes';
 import { setupProjectFileRoutes } from './routes/project-file-routes';
+import { setupAIRoutes } from './routes/ai-routes';
+import { setupProjectAIRoutes } from './routes/project-ai-routes';
 import { errorHandler } from './middleware/error-handler';
 import { logger } from './utils/logger';
 import { AppConfig } from './config/app-config';
 import { ProjectService } from './services/project-service';
 import { ProjectChatService } from './services/project-chat-service';
+import { AIService } from './services/ai-service';
+import { ProjectAIService } from './services/project-ai-service';
 
 // Загружаем переменные окружения
 dotenv.config();
@@ -27,6 +31,8 @@ const server = createServer(app);
 // Инициализация сервисов
 const projectService = new ProjectService(config.workspaceDir);
 const projectChatService = new ProjectChatService(projectService);
+const aiService = new AIService();
+const projectAIService = new ProjectAIService(projectService);
 
 // Middleware
 app.use(helmet());
@@ -49,6 +55,8 @@ app.use('/api/files', setupProjectFileRoutes(projectChatService)); // Project-aw
 app.use('/api/files', setupFileRoutes()); // Fallback для общих файлов
 app.use('/api/chat', setupChatRoutes(projectChatService)); // Project-aware чаты
 app.use('/api/projects', setupProjectRoutes(projectService));
+app.use('/api/ai', setupAIRoutes(aiService)); // AI интеграция с Gemini
+app.use('/api/projects', setupProjectAIRoutes(projectAIService)); // Project AI интеграция
 
 // Проверка здоровья сервера
 app.get('/health', (req, res) => {
