@@ -19,6 +19,30 @@ const chatHistory = new Map<string, ChatMessage[]>();
 export const setupChatRoutes = (projectChatService?: ProjectChatService): Router => {
   const router = Router();
 
+  /**
+   * @openapi
+   * /api/chat/sessions:
+   *   post:
+   *     summary: Создать новую сессию чата
+   *     tags:
+   *       - Chat
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               userId:
+   *                 type: string
+   *                 description: ID пользователя
+   *               projectId:
+   *                 type: string
+   *                 description: ID проекта (опционально)
+   *     responses:
+   *       200:
+   *         description: Сессия успешно создана
+   */
   // POST /api/chat/sessions - создать новую сессию
   router.post('/sessions', asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { userId, projectId } = req.body;
@@ -66,6 +90,24 @@ export const setupChatRoutes = (projectChatService?: ProjectChatService): Router
     res.json(response);
   }));
 
+  /**
+   * @openapi
+   * /api/chat/sessions/{sessionId}:
+   *   get:
+   *     summary: Получить информацию о сессии
+   *     tags:
+   *       - Chat
+   *     parameters:
+   *       - in: path
+   *         name: sessionId
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: ID сессии
+   *     responses:
+   *       200:
+   *         description: Информация о сессии
+   */
   // GET /api/chat/sessions/:sessionId - получить информацию о сессии
   router.get('/sessions/:sessionId', asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { sessionId } = req.params;
@@ -88,6 +130,34 @@ export const setupChatRoutes = (projectChatService?: ProjectChatService): Router
     res.json(response);
   }));
 
+  /**
+   * @openapi
+   * /api/chat/sessions/{sessionId}/history:
+   *   get:
+   *     summary: Получить историю чата по сессии
+   *     tags:
+   *       - Chat
+   *     parameters:
+   *       - in: path
+   *         name: sessionId
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: ID сессии
+   *       - in: query
+   *         name: limit
+   *         schema:
+   *           type: integer
+   *         description: Количество сообщений (по умолчанию 50)
+   *       - in: query
+   *         name: offset
+   *         schema:
+   *           type: integer
+   *         description: Смещение (по умолчанию 0)
+   *     responses:
+   *       200:
+   *         description: История сообщений
+   */
   // GET /api/chat/sessions/:sessionId/history - получить историю чата
   router.get('/sessions/:sessionId/history', asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { sessionId } = req.params;
@@ -129,6 +199,24 @@ export const setupChatRoutes = (projectChatService?: ProjectChatService): Router
     res.json(response);
   }));
 
+  /**
+   * @openapi
+   * /api/chat/sessions/{sessionId}:
+   *   delete:
+   *     summary: Завершить сессию чата
+   *     tags:
+   *       - Chat
+   *     parameters:
+   *       - in: path
+   *         name: sessionId
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: ID сессии
+   *     responses:
+   *       200:
+   *         description: Сессия завершена
+   */
   // DELETE /api/chat/sessions/:sessionId - завершить сессию
   router.delete('/sessions/:sessionId', asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { sessionId } = req.params;
@@ -158,6 +246,28 @@ export const setupChatRoutes = (projectChatService?: ProjectChatService): Router
     res.json(response);
   }));
 
+  /**
+   * @openapi
+   * /api/chat/sessions:
+   *   get:
+   *     summary: Получить список активных сессий
+   *     tags:
+   *       - Chat
+   *     parameters:
+   *       - in: query
+   *         name: userId
+   *         schema:
+   *           type: string
+   *         description: ID пользователя (фильтр)
+   *       - in: query
+   *         name: active
+   *         schema:
+   *           type: boolean
+   *         description: Только активные (по умолчанию true)
+   *     responses:
+   *       200:
+   *         description: Список сессий
+   */
   // GET /api/chat/sessions - получить список активных сессий
   router.get('/sessions', asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { userId, active = 'true' } = req.query;
@@ -185,6 +295,37 @@ export const setupChatRoutes = (projectChatService?: ProjectChatService): Router
     res.json(response);
   }));
 
+  /**
+   * @openapi
+   * /api/chat/sessions/{sessionId}/messages:
+   *   post:
+   *     summary: Добавить сообщение в историю чата
+   *     tags:
+   *       - Chat
+   *     parameters:
+   *       - in: path
+   *         name: sessionId
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: ID сессии
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               content:
+   *                 type: string
+   *                 description: Текст сообщения
+   *               sender:
+   *                 type: string
+   *                 description: Отправитель
+   *     responses:
+   *       200:
+   *         description: Сообщение добавлено
+   */
   // POST /api/chat/sessions/:sessionId/messages - добавить сообщение в историю (для внешнего использования)
   router.post('/sessions/:sessionId/messages', asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { sessionId } = req.params;
