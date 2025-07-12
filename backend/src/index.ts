@@ -69,6 +69,12 @@ app.use((req, res, next) => {
   next();
 });
 
+// Эндпоинт для получения raw OpenAPI спецификации (JSON)
+app.get('/api-docs/openapi.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
+});
+
 // Swagger UI должен быть ДО всех API-роутов
 // @ts-ignore
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
