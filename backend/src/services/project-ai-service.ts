@@ -14,7 +14,7 @@ export interface ProjectAIOptions {
 
 export class ProjectAIService {
   private aiService: AIService;
-  private projectService: ProjectService;
+  public projectService: ProjectService;
 
   constructor(projectService: ProjectService) {
     this.aiService = new AIService();

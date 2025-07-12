@@ -1,7 +1,6 @@
 import { WebSocketConnection, ChatMessage, ChatResponse, ChatError, GeminiRequest, GeminiResponse } from '../types';
 import { logger } from '../utils/logger';
 import { AppConfig } from '../config/app-config';
-import { addMessageToHistory } from '../routes/chat-routes';
 import { v4 as uuidv4 } from 'uuid';
 
 const config = new AppConfig();
@@ -55,15 +54,7 @@ export class ChatHandler {
 
       // Сохраняем ответ в истории (приводим к ChatMessage)
       if (message.conversationId) {
-        const chatMessage: ChatMessage = {
-          type: 'chat_message',
-          content: responseMessage.content,
-          sender: responseMessage.sender,
-          conversationId: responseMessage.conversationId,
-          timestamp: responseMessage.timestamp,
-          id: responseMessage.id
-        };
-        addMessageToHistory(message.conversationId, chatMessage);
+        // История чата теперь сохраняется через ProjectChatService, если нужно — реализовать здесь
       }
 
       logger.info('Chat message processed successfully', {

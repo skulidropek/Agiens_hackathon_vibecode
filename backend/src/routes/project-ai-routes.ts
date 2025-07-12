@@ -1,6 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { ProjectAIService, ProjectAIOptions } from '../services/project-ai-service';
 import { logger } from '../utils/logger';
+import { ProjectChatService } from '../services/project-chat-service';
+import { ChatMessage, Session } from '../types';
+import { v4 as uuidv4 } from 'uuid';
 
 export function setupProjectAIRoutes(projectAIService: ProjectAIService) {
   const router = Router();
@@ -197,8 +200,80 @@ export function setupProjectAIRoutes(projectAIService: ProjectAIService) {
         'Access-Control-Allow-Headers': 'Cache-Control',
       });
 
+      // Получаем сервис для работы с чатами проекта
+      const projectChatService = new ProjectChatService(projectAIService.projectService);
+
+      // Сохраняем пользовательское сообщение в историю
+      // 1. Найти или создать сессию для этого projectId и пользователя (если есть userId в options)
+      let sessionId = options?.sessionId;
+      const userId = options?.userId || 'anonymous';
+      const sessions = await projectChatService.loadSessions(projectId);
+      let session: Session | undefined = sessionId ? sessions.find(s => s.id === sessionId) : undefined;
+      if (!session) {
+        // Создаём новую сессию
+        sessionId = uuidv4();
+        const createdSession = await projectChatService.createProjectSession(projectId, userId, sessionId);
+        if (createdSession) {
+          session = createdSession;
+          sessions.push(session);
+          await projectChatService.saveSessions(projectId, sessions);
+          await projectChatService.saveHistory(projectId, sessionId, []);
+        } else {
+          res.write(`data: ${JSON.stringify({ type: 'error', timestamp: new Date().toISOString(), error: 'Не удалось создать сессию для проекта' })}\n\n`);
+          res.end();
+          return;
+        }
+      }
+      // 2. Сохраняем user message
+      const userMessage: ChatMessage = {
+        type: 'chat_message',
+        content: message,
+        sender: 'user',
+        conversationId: sessionId,
+        timestamp: new Date().toISOString(),
+        id: uuidv4()
+      };
+      const history = await projectChatService.loadHistory(projectId, sessionId);
+      history.push(userMessage);
+      await projectChatService.saveHistory(projectId, sessionId, history);
+      // 3. Стримим AI-ответ, буферизуем content, сохраняем tool-ивенты и финальный ответ
+      let aiContentBuffer = '';
+      let lastTimestamp = new Date().toISOString();
       try {
-        for await (const event of projectAIService.processMessageStream(message, { projectId, ...options })) {
+        for await (const event of projectAIService.processMessageStream(message, { projectId, ...options, sessionId })) {
+          if (event.type === 'content' && event.content) {
+            aiContentBuffer += event.content;
+            lastTimestamp = event.timestamp;
+          }
+          if (event.type === 'tool_start' || event.type === 'tools_start' || event.type === 'tools_complete') {
+            // Сохраняем tool-ивенты как отдельные сообщения типа tool_event
+            const toolEvent: ChatMessage = {
+              type: 'tool_event',
+              content: JSON.stringify(event),
+              sender: 'ai',
+              conversationId: sessionId,
+              timestamp: event.timestamp,
+              id: uuidv4()
+            };
+            history.push(toolEvent);
+            await projectChatService.saveHistory(projectId, sessionId, history);
+          }
+          if (event.type === 'complete') {
+            // Сохраняем финальный AI-ответ (final_response) как одно сообщение
+            const aiMessage: ChatMessage = {
+              type: 'chat_message',
+              content: event.final_response || aiContentBuffer,
+              sender: 'ai',
+              conversationId: sessionId,
+              timestamp: event.timestamp || lastTimestamp,
+              id: uuidv4()
+            };
+            history.push(aiMessage);
+            await projectChatService.saveHistory(projectId, sessionId, history);
+            session!.lastActivity = new Date(event.timestamp || lastTimestamp);
+            await projectChatService.saveSessions(projectId, sessions);
+            aiContentBuffer = '';
+          }
           res.write(`data: ${JSON.stringify(event)}\n\n`);
         }
       } catch (streamError) {

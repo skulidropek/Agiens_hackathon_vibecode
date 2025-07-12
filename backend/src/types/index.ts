@@ -7,7 +7,7 @@ export interface BaseWebSocketMessage {
 
 // Типы сообщений для чата
 export interface ChatMessage extends BaseWebSocketMessage {
-  type: 'chat_message';
+  type: 'chat_message' | 'tool_event';
   content: string;
   sender: 'user' | 'ai';
   conversationId?: string;

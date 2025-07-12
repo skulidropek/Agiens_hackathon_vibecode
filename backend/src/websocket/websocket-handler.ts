@@ -11,7 +11,6 @@ import {
 } from '../types';
 // import { ChatHandler } from './chat-handler';
 // import { TerminalHandler } from './terminal-handler';
-import { addMessageToHistory, updateSessionActivity } from '../routes/chat-routes';
 
 const connections = new Map<string, WebSocketConnection>();
 
@@ -96,7 +95,7 @@ export const setupWebSocketRoutes = (wss: WebSocketServer): void => {
 
         // Обновляем активность сессии если есть
         if (connection.sessionId) {
-          updateSessionActivity(connection.sessionId);
+          // updateSessionActivity(connection.sessionId); // This line is removed
         }
 
         // Маршрутизация сообщений по типу
@@ -211,7 +210,7 @@ async function handleChatMessage(connection: WebSocketConnection, message: ChatM
 
     // Сохраняем сообщение пользователя в истории
     if (message.conversationId) {
-      addMessageToHistory(message.conversationId, message);
+      // addMessageToHistory(message.conversationId, message); // This line is removed
     }
 
     // Отправляем сообщение в AI обработчик

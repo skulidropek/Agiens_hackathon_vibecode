@@ -1,5 +1,5 @@
 import { ProjectService } from './project-service';
-import { AIContext, FileInfo, Session } from '../types';
+import { AIContext, FileInfo, Session, ChatMessage } from '../types';
 import { logger } from '../utils/logger';
 import { promises as fs } from 'fs';
 import { join, extname } from 'path';
@@ -239,5 +239,62 @@ export class ProjectChatService {
     }
 
     return stats;
+  }
+
+  /**
+   * Получить путь к директории .chat внутри проекта
+   */
+  private async getChatDir(projectId: string): Promise<string> {
+    const project = await this.projectService.getProject(projectId);
+    if (!project) throw new Error('Project not found');
+    const chatDir = join(project.path, '.chat');
+    await fs.mkdir(chatDir, { recursive: true });
+    return chatDir;
+  }
+
+  /**
+   * Прочитать все сессии чата из файлового хранилища
+   */
+  async loadSessions(projectId: string): Promise<Session[]> {
+    const chatDir = await this.getChatDir(projectId);
+    const sessionsFile = join(chatDir, 'sessions.json');
+    try {
+      const data = await fs.readFile(sessionsFile, 'utf8');
+      return JSON.parse(data);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /**
+   * Сохранить все сессии чата в файловое хранилище
+   */
+  async saveSessions(projectId: string, sessions: Session[]): Promise<void> {
+    const chatDir = await this.getChatDir(projectId);
+    const sessionsFile = join(chatDir, 'sessions.json');
+    await fs.writeFile(sessionsFile, JSON.stringify(sessions, null, 2));
+  }
+
+  /**
+   * Прочитать историю сообщений для сессии
+   */
+  async loadHistory(projectId: string, conversationId: string): Promise<ChatMessage[]> {
+    const chatDir = await this.getChatDir(projectId);
+    const historyFile = join(chatDir, `history-${conversationId}.json`);
+    try {
+      const data = await fs.readFile(historyFile, 'utf8');
+      return JSON.parse(data);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /**
+   * Сохранить историю сообщений для сессии
+   */
+  async saveHistory(projectId: string, conversationId: string, history: ChatMessage[]): Promise<void> {
+    const chatDir = await this.getChatDir(projectId);
+    const historyFile = join(chatDir, `history-${conversationId}.json`);
+    await fs.writeFile(historyFile, JSON.stringify(history, null, 2));
   }
 } 
