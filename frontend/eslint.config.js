@@ -20,4 +20,15 @@ export default tseslint.config([
       globals: globals.browser,
     },
   },
+  {
+    files: ['**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/ban-ts-comment': ['error', {
+        'ts-ignore':       true,
+        'ts-nocheck':      true,
+        'ts-expect-error': true,
+        'ts-check':        false,
+      }],
+    },
+  },
 ])

@@ -23,7 +23,13 @@ module.exports = {
     'no-var': 'error',
     'prefer-const': 'error',
     'quotes': ['error', 'single'],
-    'semi': ['error', 'always']
+    'semi': ['error', 'always'],
+    '@typescript-eslint/ban-ts-comment': ['error', {
+      'ts-ignore':       true,
+      'ts-nocheck':      true,
+      'ts-expect-error': true,
+      'ts-check':        false,
+    }],
   },
   env: {
     node: true,

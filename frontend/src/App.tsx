@@ -1,7 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import SessionListPage from "./components/SessionListPage";
 import ChatPage from "./components/ChatPage";
-import "./App.css";
 
 function App() {
   return (

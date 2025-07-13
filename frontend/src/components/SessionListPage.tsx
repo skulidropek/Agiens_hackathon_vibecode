@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { Api } from "../api/Api";
+import styles from "./SessionListPage.module.css";
 
 // Тип Session (минимальный для списка)
 type Session = {
@@ -77,17 +78,17 @@ const SessionListPage: React.FC = () => {
   }, [selectedProject]);
 
   return (
-    <div className="codex-main flex flex-col items-center">
-      <header className="codex-appbar w-full flex flex-col items-center mb-6">
-        <div className="codex-logo text-2xl font-bold mb-1">Codex</div>
-        <nav className="codex-nav flex gap-4 text-sm mb-2">
-          <a href="#" className="codex-nav-link text-blue-700 hover:underline">Environments</a>
-          <a href="#" className="codex-nav-link text-blue-700 hover:underline">Docs</a>
+    <div className={styles.codexMain}>
+      <header className={styles.codexAppbar}>
+        <div className={styles.codexLogo}>Codex</div>
+        <nav className={styles.codexNav}>
+          <a href="#" className={styles.codexNavLink}>Environments</a>
+          <a href="#" className={styles.codexNavLink}>Docs</a>
         </nav>
-        <div className="codex-avatar text-2xl">●</div>
+        <div className={styles.codexAvatar}>●</div>
       </header>
-      <h1 className="codex-title text-3xl font-bold mb-8">What are we coding next?</h1>
-      <div className="w-full max-w-md flex flex-col items-center">
+      <h1 className={styles.codexTitle}>What are we coding next?</h1>
+      <div className={styles.wFullMaxWMD}>
         <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="project-select">
           Project
         </label>
@@ -98,7 +99,7 @@ const SessionListPage: React.FC = () => {
         ) : (
           <select
             id="project-select"
-            className="mb-6 w-full rounded-lg border border-gray-300 px-4 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white shadow-sm"
+            className={styles.mb6}
             value={selectedProject}
             onChange={e => setSelectedProject(e.target.value)}
           >
@@ -107,21 +108,21 @@ const SessionListPage: React.FC = () => {
             ))}
           </select>
         )}
-        <form className="codex-task-form w-full bg-white rounded-2xl shadow-lg p-6 flex flex-col gap-4 mb-8">
+        <form className={styles.codexTaskForm}>
           <textarea
-            className="codex-task-input w-full border border-gray-300 rounded-lg p-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-400 bg-gray-50"
+            className={styles.codexTaskInput}
             placeholder="Describe a task or chat"
             rows={3}
           />
-          <div className="codex-task-form-actions flex justify-end gap-2">
-            <button type="button" className="codex-btn codex-btn-secondary bg-gray-200 text-gray-700 rounded-lg px-4 py-2 font-semibold hover:bg-gray-300">Ask</button>
-            <button type="submit" className="codex-btn codex-btn-primary bg-blue-700 text-white rounded-lg px-4 py-2 font-semibold hover:bg-blue-800">Code</button>
+          <div className={styles.codexTaskFormActions}>
+            <button type="button" className={styles.codexBtn}>Ask</button>
+            <button type="submit" className={styles.codexBtn}>Code</button>
           </div>
         </form>
       </div>
-      <section className="codex-task-list-section w-full max-w-md">
-        <h2 className="codex-task-list-title text-lg font-semibold text-gray-500 mb-4">Sessions</h2>
-        <div className="codex-task-list flex flex-col gap-3">
+      <section className={styles.codexTaskListSection}>
+        <h2 className={styles.codexTaskListTitle}>Sessions</h2>
+        <div className={styles.codexTaskList}>
           {sessionsLoading ? (
             <div className="text-gray-400">Загрузка сессий...</div>
           ) : sessionsError ? (
@@ -132,7 +133,7 @@ const SessionListPage: React.FC = () => {
             sessions.map((s) => (
               <div
                 key={s.id}
-                className="codex-task-card bg-white rounded-xl shadow p-4 font-medium cursor-pointer hover:bg-blue-50"
+                className={styles.codexTaskCard}
                 onClick={() => navigate(`/chat/${s.id}`, { state: { projectId: selectedProject } })}
               >
                 {s.title || s.id}
