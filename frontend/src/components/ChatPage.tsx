@@ -1,9 +1,12 @@
 import { useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Api } from "../api/Api";
 import type { RequestParams } from "../api/http-client";
 import styles from "./ChatPage.module.css";
 import ToolEventRenderer from "./ToolEventRenderer";
+import SplitPanelLayout from "./SplitPanelLayout";
+import FileExplorer from "./FileExplorer";
+import FileViewer from "./FileViewer";
 
 interface ChatMessage {
   id: string;
@@ -33,6 +36,12 @@ const ChatPage: React.FC = () => {
   const [sending, setSending] = useState<boolean>(false);
   const [streamingAI, setStreamingAI] = useState<string>("");
   const [streaming, setStreaming] = useState<boolean>(false);
+
+  // File explorer state
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [fileContent, setFileContent] = useState<string | undefined>(undefined);
+  const [fileLoading, setFileLoading] = useState(false);
+  const [fileError, setFileError] = useState("");
 
   useEffect(() => {
     if (!projectId && sessionId) {
@@ -130,10 +139,8 @@ const ChatPage: React.FC = () => {
     try {
       const api = new Api();
       const payload = { message: draft, options: { sessionId } };
-      console.log("[Chat] projectsChatStreamCreate", projectId, payload);
       // Важно: rawResponse: true чтобы получить Response и работать с потоком
       const resp = await api.projectsChatStreamCreate(projectId, payload, { rawResponse: true } as unknown as RequestParams & { rawResponse: boolean });
-      console.log("[Chat] fetch status", resp.status);
       if (!resp.body) throw new Error("No stream");
       const reader = resp.body.getReader();
       let aiMsg = "";
@@ -150,7 +157,6 @@ const ChatPage: React.FC = () => {
             if (!dataStr) return;
             try {
               const event = JSON.parse(dataStr);
-              console.log("[Chat] SSE event", event);
               if (event.type === "content" && event.content) {
                 aiMsg += event.content;
                 setStreamingAI(aiMsg);
@@ -186,17 +192,16 @@ const ChatPage: React.FC = () => {
                 setStreamingAI("");
                 setStreaming(false);
               }
-            } catch (err) {
-              console.error("[Chat] SSE parse error", err, dataStr);
+            } catch {
+              // ignore
             }
           });
         }
       }
-    } catch (err) {
-      console.error("[Chat] fetch/send error", err);
+    } catch {
       setMessages((prev) => [...prev, {
         id: `err-${Date.now()}`,
-        content: `Ошибка отправки или получения ответа от AI: ${err instanceof Error ? err.message : String(err)}`,
+        content: `Ошибка отправки или получения ответа от AI`,
         sender: "ai",
         timestamp: new Date().toISOString(),
         type: "chat_message",
@@ -208,8 +213,44 @@ const ChatPage: React.FC = () => {
     }
   };
 
-  return (
-    <div className={styles.root}>
+  // File explorer logic
+  const handleFileSelect = useCallback(async (filePath: string) => {
+    setSelectedFile(filePath);
+    setFileContent(undefined);
+    setFileLoading(true);
+    setFileError("");
+    try {
+      if (!projectId) return;
+      const api = new Api();
+      const res = await api.filesProjectDetail2(projectId, filePath);
+      let content = "";
+      if (Array.isArray(res.data)) {
+        content = res.data.join("\n");
+      } else if (typeof res.data === "string") {
+        content = res.data;
+      } else if (res.data && typeof res.data.data === "string") {
+        content = res.data.data;
+      } else if (res.data && Array.isArray(res.data.data)) {
+        content = res.data.data.join("\n");
+      }
+      setFileContent(content);
+    } catch {
+      setFileError("Ошибка загрузки файла");
+      setFileContent(undefined);
+    } finally {
+      setFileLoading(false);
+    }
+  }, [projectId]);
+
+  const handleCloseViewer = useCallback(() => {
+    setSelectedFile(null);
+    setFileContent(undefined);
+    setFileError("");
+  }, []);
+
+  // Левая панель: чат + инструменты (все сообщения)
+  const chatPanel = (
+    <div className={styles.root} style={{ minHeight: "100vh", background: "#000" }}>
       <header className={styles.header}>
         <div className={styles.logo} onClick={() => navigate("/")}>Codex</div>
         <div className={styles.title}>Session: {sessionId}</div>
@@ -245,7 +286,7 @@ const ChatPage: React.FC = () => {
                       (m.sender === "user"
                         ? styles.userBubble
                         : streamingAI && m.id === "streaming-ai"
-                          ? styles.aiBubble // Optionally add a streaming style
+                          ? styles.aiBubble
                           : styles.aiBubble)
                     }
                   >
@@ -275,6 +316,34 @@ const ChatPage: React.FC = () => {
       </form>
       <button className={styles.backBtn} onClick={() => navigate("/")}>Back to sessions</button>
     </div>
+  );
+
+  // Правая панель: только файловый эксплорер и предпросмотр
+  const explorerPanel = (
+    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      {projectId && (
+        <FileExplorer projectId={projectId} onFileSelect={(filePath) => { handleFileSelect(filePath); }} />
+      )}
+      {selectedFile ? (
+        <div style={{ flex: 1, minHeight: 0, marginTop: 12, background: "#18181b", borderRadius: 10, boxShadow: "0 2px 12px 0 #0006" }}>
+          <FileViewer
+            filePath={selectedFile}
+            content={fileLoading ? undefined : fileContent}
+            onClose={() => { handleCloseViewer(); }}
+            inline
+          />
+          {fileError && <div style={{ color: '#f87171', padding: 18 }}>{fileError}</div>}
+        </div>
+      ) : (
+        <div style={{ flex: 1, minHeight: 0, marginTop: 12, background: '#222', borderRadius: 10, color: '#888', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontFamily: 'Fira Mono, monospace', boxShadow: '0 2px 12px 0 #0006' }}>
+          <span style={{ opacity: 0.7 }}>Выберите файл для просмотра</span>
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <SplitPanelLayout left={chatPanel} right={explorerPanel} />
   );
 };
 

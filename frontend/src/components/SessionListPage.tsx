@@ -52,22 +52,17 @@ const SessionListPage: React.FC = () => {
     const fetchSessions = async () => {
       try {
         const api = new Api();
-        console.log('Selected projectId:', selectedProject);
         const params: ChatSessionsListParams = { query: { projectId: selectedProject } };
-        console.log('Request params:', params);
         const res = await api.chatSessionsList(params as unknown as Parameters<typeof api.chatSessionsList>[0]);
         let json: { data?: Session[] } | undefined;
         if (typeof res.json === 'function') {
           json = await res.json();
-          console.log('Parsed JSON:', json);
         } else {
-          console.log('API response:', res);
           json = res as { data?: Session[] };
         }
         const sessionsArr = json?.data;
         setSessions(Array.isArray(sessionsArr) ? sessionsArr : []);
-      } catch (err) {
-        console.error('API error:', err);
+      } catch {
         setSessionsError("Ошибка загрузки сессий");
         setSessions([]);
       } finally {

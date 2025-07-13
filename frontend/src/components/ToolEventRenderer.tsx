@@ -71,38 +71,36 @@ const ToolEventRenderer: React.FC<{ message: ChatMessage }> = ({ message }) => {
   let parsed: unknown = null;
   try {
     parsed = JSON.parse(message.content);
-  } catch {
-    console.log('[ToolEventRenderer] Failed to parse message.content:', message.content);
-    return <div style={{ color: '#f87171', background: '#18181b', borderRadius: 10, padding: 16, fontFamily: 'Fira Mono, monospace', margin: '18px 0' }}>Ошибка парсинга tool_event</div>;
+  } catch (e) {
+    return <div style={{ color: '#f87171', background: '#18181b', borderRadius: 10, padding: 16, fontFamily: 'Fira Mono, monospace', margin: '18px 0', whiteSpace: 'pre-wrap' }}>
+      <b>Ошибка парсинга tool_event</b>
+      <div style={{ color: '#fff', marginTop: 8 }}>content: {String(message.content)}</div>
+      <div style={{ color: '#888', marginTop: 8 }}>error: {String(e)}</div>
+    </div>;
   }
-  console.log('[ToolEventRenderer] Parsed:', parsed);
+  if (!parsed) {
+    return <div style={{ color: '#f87171', background: '#18181b', borderRadius: 10, padding: 16, fontFamily: 'Fira Mono, monospace', margin: '18px 0' }}>Нет данных для инструмента</div>;
+  }
 
   // Batch tools (tools: [])
   const toolsArr = getToolsArray(parsed);
   if (toolsArr) {
-    console.log('[ToolEventRenderer] Detected tools array:', toolsArr);
-    return <>
-      {toolsArr.map((tool, i) => {
-        const type = getToolType(tool.name);
-        console.log(`[ToolEventRenderer] Rendering tool[${i}] type:`, type, tool);
-        if (type === 'terminal') return <TerminalEventMessage key={i} message={{...message, content: JSON.stringify(tool)}} />;
-        if (type === 'file') return <FileEventMessage key={i} tool={tool} timestamp={message.timestamp} />;
-        if (type === 'directory') return <DirectoryEventMessage key={i} tool={tool} timestamp={message.timestamp} />;
-        // Fallback for unknown tool
-        return <div key={i} style={{ background: '#23272e', color: '#fff', borderRadius: 10, padding: 14, margin: '12px 0', fontFamily: 'Fira Mono, monospace' }}>
-          <b>{tool.name}</b>
-          <pre style={{ margin: 0, fontSize: 13 }}>{tool.result ? String(tool.result) : tool.error ? String(tool.error) : 'Выполнено.'}</pre>
-        </div>;
-      })}
-    </>;
+    return <>{toolsArr.map((tool, i) => {
+      const type = getToolType(tool.name);
+      if (type === 'terminal' || tool.name === 'run_shell_command') {
+        return <TerminalEventMessage key={i} message={{...message, content: JSON.stringify(tool)}} />;
+      }
+      if (type === 'file') return <FileEventMessage key={i} tool={tool} timestamp={message.timestamp} />;
+      if (type === 'directory') return <DirectoryEventMessage key={i} tool={tool} timestamp={message.timestamp} />;
+      return null;
+    })}</>;
   }
 
   // Single tool (tool: {...})
   const singleTool = getSingleTool(parsed);
   if (singleTool) {
     const type = getToolType(singleTool.name);
-    console.log('[ToolEventRenderer] Rendering single tool type:', type, singleTool);
-    if (type === 'terminal') return <TerminalEventMessage message={{...message, content: JSON.stringify(singleTool)}} />;
+    if (type === 'terminal' || singleTool.name === 'run_shell_command') return <TerminalEventMessage message={{...message, content: JSON.stringify(singleTool)}} />;
     if (type === 'file') return <FileEventMessage tool={singleTool} timestamp={message.timestamp} />;
     if (type === 'directory') return <DirectoryEventMessage tool={singleTool} timestamp={message.timestamp} />;
     return <div style={{ background: '#23272e', color: '#fff', borderRadius: 10, padding: 14, margin: '12px 0', fontFamily: 'Fira Mono, monospace' }}>
@@ -113,7 +111,6 @@ const ToolEventRenderer: React.FC<{ message: ChatMessage }> = ({ message }) => {
 
   // Flat terminal event
   if (isFlatTerminal(parsed)) {
-    console.log('[ToolEventRenderer] Detected flat terminal event:', parsed);
     const obj = parsed as { command: string; description?: string; result?: string; error?: string };
     const tool = {
       tool: 'run_shell_command',
@@ -125,26 +122,22 @@ const ToolEventRenderer: React.FC<{ message: ChatMessage }> = ({ message }) => {
   }
   // Flat file event
   if (isFlatFile(parsed)) {
-    console.log('[ToolEventRenderer] Detected flat file event:', parsed);
     return <FileEventMessage tool={parsed as Tool} timestamp={message.timestamp} />;
   }
   // Flat directory event
   if (isFlatDirectory(parsed)) {
-    console.log('[ToolEventRenderer] Detected flat directory event:', parsed);
     return <DirectoryEventMessage tool={parsed as Tool} timestamp={message.timestamp} />;
   }
 
   // tools_start/tools_complete/tool_start/tool_complete events with type only
   const typeStr = getTypeString(parsed);
   if (typeStr) {
-    console.log('[ToolEventRenderer] Detected type-only event:', typeStr);
     // Show as info block
     return <div style={{ background: '#23272e', color: '#38bdf8', borderRadius: 10, padding: 12, margin: '12px 0', fontFamily: 'Fira Mono, monospace', fontWeight: 600 }}>
       {typeStr.replace(/_/g, ' ')}
     </div>;
   }
 
-  console.log('[ToolEventRenderer] Fallback rendering for:', parsed);
   // Fallback
   return <div style={{ background: '#23272e', color: '#fff', borderRadius: 10, padding: 14, margin: '12px 0', fontFamily: 'Fira Mono, monospace' }}>
     Tool event

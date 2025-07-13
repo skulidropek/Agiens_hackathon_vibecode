@@ -50,15 +50,18 @@ const FileEventMessage: React.FC<{ tool: FileTool; timestamp: string }> = ({ too
   };
 
   return (
-    <div style={{ background: "#18181b", color: "#fff", borderRadius: 14, padding: 18, margin: "18px 0", fontFamily: 'Fira Mono, monospace', boxShadow: "0 2px 12px 0 #0006" }}>
-      <div style={{ fontWeight: 700, color: "#38bdf8", marginBottom: 6 }}>
-        {name.replace(/_/g, ' ')} {filePath && <span style={{ color: "#fff", fontWeight: 400 }}>/ {filePath}</span>}
+    <>
+      <div style={{background: 'blue', color: '#fff', padding: 4}}>FileEventMessage работает</div>
+      <div style={{ background: "#18181b", color: "#fff", borderRadius: 14, padding: 18, margin: "18px 0", fontFamily: 'Fira Mono, monospace', boxShadow: "0 2px 12px 0 #0006" }}>
+        <div style={{ fontWeight: 700, color: "#38bdf8", marginBottom: 6 }}>
+          {name.replace(/_/g, ' ')} {filePath && <span style={{ color: "#fff", fontWeight: 400 }}>/ {filePath}</span>}
+        </div>
+        {diffBlock}
+        {result !== undefined && <pre style={{ background: "#23272e", color: "#fff", borderRadius: 8, padding: 10, marginTop: 8, fontSize: 14, overflowX: 'auto' }}>{renderValue(result)}</pre>}
+        {error !== undefined && <pre style={{ background: "#3b1d1d", color: "#f87171", borderRadius: 8, padding: 10, marginTop: 8, fontSize: 14, overflowX: 'auto' }}>{renderValue(error)}</pre>}
+        <div style={{ color: "#6b7280", fontSize: 12, textAlign: "right", marginTop: 12, letterSpacing: ".08em" }}>{new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
       </div>
-      {diffBlock}
-      {result !== undefined && <pre style={{ background: "#23272e", color: "#fff", borderRadius: 8, padding: 10, marginTop: 8, fontSize: 14, overflowX: 'auto' }}>{renderValue(result)}</pre>}
-      {error !== undefined && <pre style={{ background: "#3b1d1d", color: "#f87171", borderRadius: 8, padding: 10, marginTop: 8, fontSize: 14, overflowX: 'auto' }}>{renderValue(error)}</pre>}
-      <div style={{ color: "#6b7280", fontSize: 12, textAlign: "right", marginTop: 12, letterSpacing: ".08em" }}>{new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
-    </div>
+    </>
   );
 };
 

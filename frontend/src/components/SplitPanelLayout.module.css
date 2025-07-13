@@ -4,10 +4,10 @@
   background: #181c20;
 }
 .leftPanel {
-  width: 420px;
-  min-width: 320px;
-  max-width: 500px;
-  flex: 0 0 420px;
+  width: 480px;
+  min-width: 360px;
+  max-width: 560px;
+  flex: 0 0 480px;
   background: #23272e;
   border-right: 2px solid #222;
   display: flex;
@@ -16,7 +16,7 @@
 }
 .rightPanel {
   flex: 1 1 0;
-  min-width: 0;
+  min-width: 340px;
   width: auto;
   max-width: none;
   background: #181c20;

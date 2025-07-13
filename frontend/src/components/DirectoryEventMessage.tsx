@@ -32,20 +32,23 @@ const DirectoryEventMessage: React.FC<{ tool: DirectoryTool; timestamp: string }
     return null;
   };
   return (
-    <div style={{ background: "#18181b", color: "#fff", borderRadius: 14, padding: 18, margin: "18px 0", fontFamily: 'Fira Mono, monospace', boxShadow: "0 2px 12px 0 #0006" }}>
-      <div style={{ fontWeight: 700, color: "#38bdf8", marginBottom: 6 }}>
-        Directory listing <span style={{ color: "#fff", fontWeight: 400 }}>/ {path}</span>
+    <>
+      <div style={{background: 'green', color: '#fff', padding: 4}}>DirectoryEventMessage работает</div>
+      <div style={{ background: "#18181b", color: "#fff", borderRadius: 14, padding: 18, margin: "18px 0", fontFamily: 'Fira Mono, monospace', boxShadow: "0 2px 12px 0 #0006" }}>
+        <div style={{ fontWeight: 700, color: "#38bdf8", marginBottom: 6 }}>
+          Directory listing <span style={{ color: "#fff", fontWeight: 400 }}>/ {path}</span>
+        </div>
+        {error !== undefined && <pre style={{ background: "#3b1d1d", color: "#f87171", borderRadius: 8, padding: 10, marginTop: 8, fontSize: 14, overflowX: 'auto' }}>{renderValue(error)}</pre>}
+        {items.length > 0 && (
+          <ul style={{ margin: 0, padding: 0, listStyle: 'none', fontSize: 14 }}>
+            {items.map((item, i) => (
+              <li key={i} style={{ color: item.startsWith('.') ? '#888' : '#fff', padding: '2px 0' }}>{item}</li>
+            ))}
+          </ul>
+        )}
+        <div style={{ color: "#6b7280", fontSize: 12, textAlign: "right", marginTop: 12, letterSpacing: ".08em" }}>{new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
       </div>
-      {error !== undefined && <pre style={{ background: "#3b1d1d", color: "#f87171", borderRadius: 8, padding: 10, marginTop: 8, fontSize: 14, overflowX: 'auto' }}>{renderValue(error)}</pre>}
-      {items.length > 0 && (
-        <ul style={{ margin: 0, padding: 0, listStyle: 'none', fontSize: 14 }}>
-          {items.map((item, i) => (
-            <li key={i} style={{ color: item.startsWith('.') ? '#888' : '#fff', padding: '2px 0' }}>{item}</li>
-          ))}
-        </ul>
-      )}
-      <div style={{ color: "#6b7280", fontSize: 12, textAlign: "right", marginTop: 12, letterSpacing: ".08em" }}>{new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
-    </div>
+    </>
   );
 };
 
