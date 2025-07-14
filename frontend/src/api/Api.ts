@@ -681,4 +681,11 @@ export class Api<
       type: ContentType.Json,
     });
   }
+
+  getTerminals = (projectId: string) => {
+    return this.request<any, any>({
+      path: `/api/terminals?projectId=${projectId}`,
+      method: "GET",
+    });
+  }
 }

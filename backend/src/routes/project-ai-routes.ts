@@ -198,7 +198,12 @@ export function setupProjectAIRoutes(projectAIService: ProjectAIService) {
         'Connection': 'keep-alive',
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Cache-Control',
+        'X-Accel-Buffering': 'no', // Отключаем буферизацию в nginx
       });
+      
+      // Отправляем первый keepalive для открытия соединения
+      res.write(`data: ${JSON.stringify({ type: 'connection_opened', timestamp: new Date().toISOString() })}\n\n`);
+      res.flush?.();
 
       // Получаем сервис для работы с чатами проекта
       const projectChatService = new ProjectChatService(projectAIService.projectService);
@@ -275,6 +280,7 @@ export function setupProjectAIRoutes(projectAIService: ProjectAIService) {
             aiContentBuffer = '';
           }
           res.write(`data: ${JSON.stringify(event)}\n\n`);
+          res.flush?.(); // Принудительно отправляем данные клиенту
         }
       } catch (streamError) {
         logger.error('Error in Project AI stream:', streamError instanceof Error ? streamError.message : String(streamError));

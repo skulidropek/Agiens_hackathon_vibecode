@@ -158,11 +158,17 @@ export function setupAIRoutes(aiService: AIService) {
         'Connection': 'keep-alive',
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Cache-Control',
+        'X-Accel-Buffering': 'no', // Отключаем буферизацию в nginx
       });
+      
+      // Отправляем первый keepalive для открытия соединения
+      res.write(`data: ${JSON.stringify({ type: 'connection_opened', timestamp: new Date().toISOString() })}\n\n`);
+      res.flush?.();
 
       try {
         for await (const event of aiService.processMessageStream(message, options)) {
           res.write(`data: ${JSON.stringify(event)}\n\n`);
+          res.flush?.(); // Принудительно отправляем данные клиенту
         }
       } catch (streamError) {
         logger.error('Error in AI stream:', streamError instanceof Error ? streamError.message : String(streamError));

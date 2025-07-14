@@ -1,0 +1,243 @@
+.terminalPanel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: #1e1e1e;
+  border-top: 1px solid #3e3e3e;
+  color: #cccccc;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.terminalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 35px;
+  padding: 0 12px;
+  background-color: #2d2d2d;
+  border-bottom: 1px solid #3e3e3e;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.terminalTitle {
+  color: #cccccc;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.terminalActions {
+  display: flex;
+  gap: 4px;
+}
+
+.actionButton {
+  width: 22px;
+  height: 22px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 2px;
+  color: #cccccc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  transition: background-color 0.1s ease;
+}
+
+.actionButton:hover {
+  background-color: #3e3e3e;
+}
+
+.actionButton:active {
+  background-color: #4e4e4e;
+}
+
+.tabBar {
+  display: flex;
+  align-items: flex-end;
+  height: 35px;
+  background-color: #252526;
+  border-bottom: 1px solid #3e3e3e;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  height: 35px;
+  padding: 0 12px;
+  background-color: #2d2d2d;
+  border-right: 1px solid #3e3e3e;
+  cursor: pointer;
+  font-size: 13px;
+  color: #cccccc;
+  min-width: 150px;
+  max-width: 200px;
+  position: relative;
+  transition: background-color 0.1s ease;
+}
+
+.tab:hover {
+  background-color: #37373d;
+}
+
+.tab.active {
+  background-color: #1e1e1e;
+  border-bottom: 1px solid #1e1e1e;
+  color: #ffffff;
+}
+
+.tabTitle {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: 'Fira Code', Monaco, 'Courier New', monospace;
+}
+
+.tabClose {
+  width: 16px;
+  height: 16px;
+  margin-left: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 2px;
+  color: #cccccc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  opacity: 0.7;
+  transition: all 0.1s ease;
+}
+
+.tabClose:hover {
+  background-color: #3e3e3e;
+  opacity: 1;
+}
+
+.newTabButton {
+  width: 35px;
+  height: 35px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #cccccc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: background-color 0.1s ease;
+}
+
+.newTabButton:hover {
+  background-color: #3e3e3e;
+}
+
+.terminalContent {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.noTerminals {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #858585;
+  font-size: 14px;
+  gap: 12px;
+}
+
+.startButton {
+  padding: 8px 16px;
+  background-color: #0e639c;
+  border: none;
+  border-radius: 2px;
+  color: #ffffff;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+}
+
+.startButton:hover {
+  background-color: #1177bb;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #858585;
+  font-size: 14px;
+}
+
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #f14c4c;
+  font-size: 14px;
+  gap: 8px;
+}
+
+.retryButton {
+  padding: 6px 12px;
+  background-color: #f14c4c;
+  border: none;
+  border-radius: 2px;
+  color: #ffffff;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+}
+
+.retryButton:hover {
+  background-color: #e73c3c;
+}
+
+/* XTerm specific styles */
+.terminalContent :global(.xterm) {
+  padding: 8px !important;
+}
+
+.terminalContent :global(.xterm-viewport) {
+  background-color: #1e1e1e !important;
+}
+
+.terminalContent :global(.xterm-screen) {
+  background-color: #1e1e1e !important;
+}
+
+/* Scrollbar styling */
+.terminalContent :global(.xterm-viewport)::-webkit-scrollbar {
+  width: 10px;
+}
+
+.terminalContent :global(.xterm-viewport)::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+.terminalContent :global(.xterm-viewport)::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 5px;
+}
+
+.terminalContent :global(.xterm-viewport)::-webkit-scrollbar-thumb:hover {
+  background: #555555;
+}
+
+/* Hide scrollbar for Firefox */
+.terminalContent :global(.xterm-viewport) {
+  scrollbar-width: thin;
+  scrollbar-color: #424242 #1e1e1e;
+} 

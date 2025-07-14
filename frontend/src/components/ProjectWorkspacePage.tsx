@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { FileExplorer } from './FileExplorer';
 import { MonacoEditor } from './MonacoEditor';
+import { TerminalPanel } from './TerminalPanel';
 import { useFileWatcher } from '../hooks/useFileWatcher';
 import styles from './ProjectWorkspacePage.module.css';
 
@@ -11,6 +12,7 @@ export const ProjectWorkspacePage: React.FC = () => {
   const [fileContent, setFileContent] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isTerminalVisible, setIsTerminalVisible] = useState(true);
   const { state: fileWatcherState, actions: fileWatcherActions } = useFileWatcher();
 
   // Инициализируем проект и запускаем file watcher
@@ -149,19 +151,38 @@ export const ProjectWorkspacePage: React.FC = () => {
         </div>
 
         <div className={styles.rightPanel}>
-          {isLoading ? (
-            <div className={styles.loadingContainer}>
-              <div className={styles.loadingSpinner}></div>
-              <span>Loading file...</span>
+          <div className={styles.editorSection}>
+            {isLoading ? (
+              <div className={styles.loadingContainer}>
+                <div className={styles.loadingSpinner}></div>
+                <span>Loading file...</span>
+              </div>
+            ) : (
+              <MonacoEditor
+                filePath={selectedFile}
+                content={fileContent}
+                onContentChange={handleContentChange}
+                onSave={handleSave}
+              />
+            )}
+          </div>
+          
+          <div className={styles.terminalSection}>
+            <div className={styles.terminalToggle}>
+              <button 
+                className={styles.toggleButton}
+                onClick={() => setIsTerminalVisible(!isTerminalVisible)}
+              >
+                {isTerminalVisible ? '⬇ Hide Terminal' : '⬆ Show Terminal'}
+              </button>
             </div>
-          ) : (
-            <MonacoEditor
-              filePath={selectedFile}
-              content={fileContent}
-              onContentChange={handleContentChange}
-              onSave={handleSave}
-            />
-          )}
+            {isTerminalVisible && projectId && (
+              <TerminalPanel 
+                projectId={projectId} 
+                isVisible={isTerminalVisible}
+              />
+            )}
+          </div>
         </div>
       </div>
 

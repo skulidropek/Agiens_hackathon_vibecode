@@ -37,6 +37,39 @@ const ChatPage: React.FC = () => {
   const [sending, setSending] = useState<boolean>(false);
   const [streamingAI, setStreamingAI] = useState<string>("");
   const [streaming, setStreaming] = useState<boolean>(false);
+  const [lastStreamUpdate, setLastStreamUpdate] = useState<number>(0);
+  const lastStreamContentRef = useRef<string>('');
+  
+  // Мемоизированные обработчики для лучшей производительности
+  const renderMessage = useCallback((m: ChatMessage) => {
+    if (m.type === "tool_event") {
+      return <ToolEventRenderer key={m.id} message={m} />;
+    }
+    return (
+      <div
+        key={m.id}
+        className={`${styles.messageRow} ${m.sender === "user" ? styles.justifyEnd : styles.justifyStart}`}
+      >
+        <div
+          className={
+            `${styles.bubble} ` +
+            (m.sender === "user"
+              ? styles.userBubble
+              : streamingAI && m.id === "streaming-ai"
+                ? styles.aiBubble
+                : styles.aiBubble)
+          }
+        >
+          <div className={styles.meta}>
+            <span className={m.sender === "user" ? styles.userSender : styles.aiSender}>{m.sender === "user" ? "You" : "AI"}</span>
+            <span className={styles.time}>{new Date(m.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+            {streamingAI && m.id === "streaming-ai" && <span style={{ marginLeft: 8, color: "#38bdf8", animation: "pulse 1.5s infinite" }}>●</span>}
+          </div>
+          <div>{m.content}</div>
+        </div>
+      </div>
+    );
+  }, [streamingAI]);
 
   // File system state
   const [selectedFile, setSelectedFile] = useState<string>("");
@@ -124,7 +157,7 @@ const ChatPage: React.FC = () => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages]);
+  }, [messages, streamingAI]);
 
   // --- Новая функция отправки и стриминга ---
   const handleSend = async (e?: React.FormEvent) => {
@@ -174,11 +207,31 @@ const ChatPage: React.FC = () => {
             if (!dataStr) return;
             try {
               const event = JSON.parse(dataStr);
+              console.log('Received streaming event:', event.type, new Date().toISOString());
+              if (event.type === "connection_opened") {
+                console.log('SSE connection opened for streaming');
+                return; // Игнорируем это служебное событие
+              }
               if (event.type === "content" && event.content) {
                 aiMsg += event.content;
-                setStreamingAI(aiMsg);
+                console.log('Streaming content update:', aiMsg.length, 'chars');
+                
+                // Throttle UI updates для лучшей производительности
+                const now = Date.now();
+                lastStreamContentRef.current = aiMsg; // Сохраняем последнее значение
+                
+                if (now - lastStreamUpdate > 100) { // Обновляем UI максимум раз в 100ms
+                  setStreamingAI(aiMsg);
+                  setLastStreamUpdate(now);
+                } else {
+                  // Для последнего кусочка контента обновляем сразу
+                  setTimeout(() => {
+                    setStreamingAI(lastStreamContentRef.current);
+                  }, 50);
+                }
               }
               if (event.type === "tool_start" || event.type === "tools_start" || event.type === "tools_complete") {
+                console.log('Adding tool event:', event.type, event.timestamp);
                 setMessages((prev) => [...prev, {
                   id: `tool-${Date.now()}-${Math.random()}`,
                   content: JSON.stringify(event),
@@ -325,35 +378,7 @@ const ChatPage: React.FC = () => {
         ) : (
           [...messages, ...(streamingAI ? [{ id: "streaming-ai", content: streamingAI, sender: "ai", timestamp: new Date().toISOString(), type: "chat_message" }] : [])]
             .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-            .map((m) => {
-              if (m.type === "tool_event") {
-                return <ToolEventRenderer key={m.id} message={m} />;
-              }
-              return (
-                <div
-                  key={m.id}
-                  className={`${styles.messageRow} ${m.sender === "user" ? styles.justifyEnd : styles.justifyStart}`}
-                >
-                  <div
-                    className={
-                      `${styles.bubble} ` +
-                      (m.sender === "user"
-                        ? styles.userBubble
-                        : streamingAI && m.id === "streaming-ai"
-                          ? styles.aiBubble
-                          : styles.aiBubble)
-                    }
-                  >
-                    <div className={styles.meta}>
-                      <span className={m.sender === "user" ? styles.userSender : styles.aiSender}>{m.sender === "user" ? "You" : "AI"}</span>
-                      <span className={styles.time}>{new Date(m.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-                      {streamingAI && m.id === "streaming-ai" && <span style={{ marginLeft: 8, color: "#38bdf8", animation: "pulse 1.5s infinite" }}>●</span>}
-                    </div>
-                    <div>{m.content}</div>
-                  </div>
-                </div>
-              );
-            })
+            .map(renderMessage)
         )}
         <div ref={messagesEndRef} />
       </section>

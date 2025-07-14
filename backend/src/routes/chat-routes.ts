@@ -129,8 +129,13 @@ export const setupChatRoutes = (projectChatService: ProjectChatService): Router 
     const limitNum = parseInt(limit as string, 10);
     const offsetNum = parseInt(offset as string, 10);
 
+    // Берём последние сообщения из истории, а затем переворачиваем для правильного порядка
+    const totalMessages = history.length;
+    const startIndex = Math.max(0, totalMessages - offsetNum - limitNum);
+    const endIndex = totalMessages - offsetNum;
+    
     const paginatedHistory = history
-      .slice(offsetNum, offsetNum + limitNum)
+      .slice(startIndex, endIndex)
       .reverse(); // Показываем последние сообщения первыми
 
     const response: ApiResponse<{
