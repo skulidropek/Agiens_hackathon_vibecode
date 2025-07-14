@@ -1,58 +1,59 @@
-import { spawn } from 'node-pty';
 import { WebSocketConnection, TerminalInput, TerminalCommand, TerminalOutput, TerminalStatus } from '../types';
 import { logger } from '../utils/logger';
-import { AppConfig } from '../config/app-config';
+import { TerminalService } from '../services/terminal-service';
 import { v4 as uuidv4 } from 'uuid';
 
-const config = new AppConfig();
-
-interface TerminalSession {
-  id: string;
-  process: import('node-pty').IPty;
-  connection: WebSocketConnection;
-  startTime: Date;
-  lastActivity: Date;
-  isActive: boolean;
-  workingDirectory: string;
-  history: string[];
-}
-
 export class TerminalHandler {
-  private sessions = new Map<string, TerminalSession>();
-  private readonly maxHistoryLength = 1000;
+  private terminalService: TerminalService;
+  private connections = new Map<string, Set<WebSocketConnection>>();
 
-  constructor() {
-    // Очистка неактивных сессий каждые 5 минут
-    setInterval(() => {
-      this.cleanupInactiveSessions();
-    }, 5 * 60 * 1000);
+  constructor(terminalService: TerminalService) {
+    this.terminalService = terminalService;
+    
+    // Setup terminal service event handlers
+    this.terminalService.onSessionOutput = (sessionId: string, data: string) => {
+      this.broadcastOutput(sessionId, data);
+    };
+    
+    this.terminalService.onSessionExit = (sessionId: string, exitCode: number) => {
+      this.broadcastExit(sessionId, exitCode);
+    };
+    
+    this.terminalService.onSessionError = (sessionId: string, error: string) => {
+      this.broadcastError(sessionId, error);
+    };
   }
 
+  /**
+   * Handle terminal input from WebSocket
+   */
   public async handleInput(connection: WebSocketConnection, message: TerminalInput): Promise<void> {
-    const session = this.getOrCreateSession(connection);
-    
-    if (!session) {
-      this.sendErrorMessage(connection, 'Failed to create terminal session', 'SESSION_ERROR');
-      return;
-    }
-
     try {
-      // Отправляем ввод в терминал
-      session.process.write(message.data);
-      session.lastActivity = new Date();
+      const { sessionId, data } = message;
       
-      // Добавляем в историю
-      session.history.push(`INPUT: ${message.data}`);
-      this.trimHistory(session);
+      if (!sessionId) {
+        this.sendErrorMessage(connection, 'Session ID is required', 'MISSING_SESSION_ID');
+        return;
+      }
+
+      const success = this.terminalService.writeToSession(sessionId, data);
+      if (!success) {
+        this.sendErrorMessage(connection, 'Failed to write to terminal session', 'WRITE_FAILED');
+        return;
+      }
+
+      // Add connection to session subscribers if not already added
+      this.addConnectionToSession(sessionId, connection);
 
       logger.debug('Terminal input processed', {
-        sessionId: session.id,
-        inputLength: message.data.length
+        sessionId,
+        connectionId: connection.id,
+        inputLength: data.length
       });
 
     } catch (error) {
       logger.error('Error processing terminal input', {
-        sessionId: session.id,
+        connectionId: connection.id,
         error: error instanceof Error ? error.message : String(error)
       });
       
@@ -60,32 +61,36 @@ export class TerminalHandler {
     }
   }
 
+  /**
+   * Handle terminal command from WebSocket
+   */
   public async handleCommand(connection: WebSocketConnection, message: TerminalCommand): Promise<void> {
-    const session = this.getOrCreateSession(connection);
-    
-    if (!session) {
-      this.sendErrorMessage(connection, 'Failed to create terminal session', 'SESSION_ERROR');
-      return;
-    }
-
     try {
+      const { sessionId, command } = message;
+      
+      if (!sessionId) {
+        this.sendErrorMessage(connection, 'Session ID is required', 'MISSING_SESSION_ID');
+        return;
+      }
+
       logger.info('Executing terminal command', {
-        sessionId: session.id,
-        command: message.command
+        sessionId,
+        connectionId: connection.id,
+        command
       });
 
-      // Отправляем команду в терминал
-      session.process.write(message.command + '\n');
-      session.lastActivity = new Date();
-      
-      // Добавляем в историю
-      session.history.push(`COMMAND: ${message.command}`);
-      this.trimHistory(session);
+      const success = this.terminalService.writeToSession(sessionId, command + '\n');
+      if (!success) {
+        this.sendErrorMessage(connection, 'Failed to execute command', 'COMMAND_FAILED');
+        return;
+      }
+
+      // Add connection to session subscribers if not already added
+      this.addConnectionToSession(sessionId, connection);
 
     } catch (error) {
       logger.error('Error executing terminal command', {
-        sessionId: session.id,
-        command: message.command,
+        connectionId: connection.id,
         error: error instanceof Error ? error.message : String(error)
       });
       
@@ -93,135 +98,192 @@ export class TerminalHandler {
     }
   }
 
-  public closeSession(sessionId: string): void {
-    const session = this.sessions.get(sessionId);
-    if (session) {
-      logger.info('Closing terminal session', { sessionId });
-      
-      session.isActive = false;
-      session.process.kill();
-      this.sessions.delete(sessionId);
-      
-      // Отправляем статус закрытия
-      this.sendStatusMessage(session.connection, 'stopped', sessionId);
-    }
-  }
-
-  private getOrCreateSession(connection: WebSocketConnection): TerminalSession | null {
-    const sessionId = connection.sessionId;
-    if (!sessionId) {
-      return null;
-    }
-
-    // Проверяем существующую сессию
-    let session = this.sessions.get(sessionId);
-    if (session && session.isActive) {
-      return session;
-    }
-
-    // Создаем новую сессию
+  /**
+   * Handle terminal resize from WebSocket
+   */
+  public async handleResize(connection: WebSocketConnection, sessionId: string, cols: number, rows: number): Promise<void> {
     try {
-      const ptyProcess = spawn('bash', [], {
-        name: 'xterm-color',
-        cols: 80,
-        rows: 24,
-        cwd: config.workspaceDir,
-        env: {
-          ...process.env,
-          TERM: 'xterm-256color',
-          COLORTERM: 'truecolor'
-        }
-      });
+      if (!sessionId) {
+        this.sendErrorMessage(connection, 'Session ID is required', 'MISSING_SESSION_ID');
+        return;
+      }
 
-      session = {
-        id: sessionId,
-        process: ptyProcess,
-        connection,
-        startTime: new Date(),
-        lastActivity: new Date(),
-        isActive: true,
-        workingDirectory: config.workspaceDir,
-        history: []
-      };
+      const success = this.terminalService.resizeSession(sessionId, cols, rows);
+      if (!success) {
+        this.sendErrorMessage(connection, 'Failed to resize terminal', 'RESIZE_FAILED');
+        return;
+      }
 
-      // Настраиваем обработчики событий терминала
-      ptyProcess.onData((data) => {
-        this.handleTerminalOutput(session!, data);
-      });
-
-      ptyProcess.onExit((exitCode) => {
-        this.handleTerminalExit(session!, typeof exitCode === 'number' ? exitCode : exitCode.exitCode);
-      });
-
-      this.sessions.set(sessionId, session);
-      
-      logger.info('Created new terminal session', {
+      logger.debug('Terminal resized', {
         sessionId,
-        pid: ptyProcess.pid,
-        workingDirectory: config.workspaceDir
+        connectionId: connection.id,
+        cols,
+        rows
       });
-
-      // Отправляем статус запуска
-      this.sendStatusMessage(connection, 'started', sessionId, ptyProcess.pid);
-
-      return session;
 
     } catch (error) {
-      logger.error('Failed to create terminal session', {
+      logger.error('Error resizing terminal', {
+        connectionId: connection.id,
         sessionId,
         error: error instanceof Error ? error.message : String(error)
       });
       
-      return null;
+      this.sendErrorMessage(connection, 'Failed to resize terminal', 'RESIZE_ERROR');
     }
   }
 
-  private handleTerminalOutput(session: TerminalSession, data: string): void {
-    // Отправляем вывод клиенту
+  /**
+   * Subscribe connection to terminal session
+   */
+  public subscribeToSession(sessionId: string, connection: WebSocketConnection): void {
+    this.addConnectionToSession(sessionId, connection);
+    
+    // Send current session status
+    const session = this.terminalService.getSession(sessionId);
+    if (session) {
+      this.sendStatusMessage(connection, session.isActive ? 'active' : 'stopped', sessionId, session.pid);
+    } else {
+      this.sendErrorMessage(connection, 'Terminal session not found', 'SESSION_NOT_FOUND');
+    }
+  }
+
+  /**
+   * Unsubscribe connection from terminal session
+   */
+  public unsubscribeFromSession(sessionId: string, connection: WebSocketConnection): void {
+    const connections = this.connections.get(sessionId);
+    if (connections) {
+      connections.delete(connection);
+      
+      if (connections.size === 0) {
+        this.connections.delete(sessionId);
+      }
+    }
+  }
+
+  /**
+   * Close session when connection closes
+   */
+  public handleConnectionClose(connection: WebSocketConnection): void {
+    // Remove connection from all sessions
+    for (const [sessionId, connections] of this.connections) {
+      connections.delete(connection);
+      
+      if (connections.size === 0) {
+        this.connections.delete(sessionId);
+        
+        // Optionally kill session when no connections are left
+        // this.terminalService.killSession(sessionId);
+      }
+    }
+  }
+
+  /**
+   * Get session statistics
+   */
+  public getSessionStats() {
+    return this.terminalService.getStats();
+  }
+
+  /**
+   * Cleanup all sessions
+   */
+  public cleanup(): void {
+    this.connections.clear();
+    this.terminalService.cleanup();
+  }
+
+  /**
+   * Add connection to session subscribers
+   */
+  private addConnectionToSession(sessionId: string, connection: WebSocketConnection): void {
+    if (!this.connections.has(sessionId)) {
+      this.connections.set(sessionId, new Set());
+    }
+    
+    this.connections.get(sessionId)!.add(connection);
+  }
+
+  /**
+   * Broadcast terminal output to all subscribers
+   */
+  private broadcastOutput(sessionId: string, data: string): void {
+    const connections = this.connections.get(sessionId);
+    if (!connections) return;
+
     const outputMessage: TerminalOutput = {
       type: 'terminal_output',
       data,
-      sessionId: session.id,
+      sessionId,
       timestamp: new Date().toISOString(),
       id: uuidv4()
     };
 
-    this.sendMessage(session.connection, outputMessage);
-    
-    // Добавляем в историю
-    session.history.push(`OUTPUT: ${data}`);
-    this.trimHistory(session);
-    
-    session.lastActivity = new Date();
+    for (const connection of connections) {
+      this.sendMessage(connection, outputMessage);
+    }
 
-    logger.debug('Terminal output sent', {
-      sessionId: session.id,
-      outputLength: data.length
+    logger.debug('Terminal output broadcasted', {
+      sessionId,
+      connectionCount: connections.size,
+      dataLength: data.length
     });
   }
 
-  private handleTerminalExit(session: TerminalSession, exitCode: number): void {
-    logger.info('Terminal session exited', {
-      sessionId: session.id,
-      exitCode
-    });
+  /**
+   * Broadcast terminal exit to all subscribers
+   */
+  private broadcastExit(sessionId: string, exitCode: number): void {
+    const connections = this.connections.get(sessionId);
+    if (!connections) return;
 
-    session.isActive = false;
-    this.sessions.delete(session.id);
-    
-    // Отправляем статус завершения
-    this.sendStatusMessage(session.connection, 'stopped', session.id);
+    for (const connection of connections) {
+      this.sendStatusMessage(connection, 'stopped', sessionId);
+    }
+
+    // Clean up connections for this session
+    this.connections.delete(sessionId);
+
+    logger.info('Terminal exit broadcasted', {
+      sessionId,
+      exitCode,
+      connectionCount: connections.size
+    });
   }
 
+  /**
+   * Broadcast terminal error to all subscribers
+   */
+  private broadcastError(sessionId: string, error: string): void {
+    const connections = this.connections.get(sessionId);
+    if (!connections) return;
+
+    for (const connection of connections) {
+      this.sendErrorMessage(connection, error, 'TERMINAL_ERROR');
+    }
+
+    logger.error('Terminal error broadcasted', {
+      sessionId,
+      error,
+      connectionCount: connections.size
+    });
+  }
+
+  /**
+   * Send message to WebSocket connection
+   */
   private sendMessage(connection: WebSocketConnection, message: TerminalOutput): void {
     if (connection.ws.readyState === 1) { // WebSocket.OPEN
       connection.ws.send(JSON.stringify(message));
     }
   }
 
+  /**
+   * Send status message to WebSocket connection
+   */
   private sendStatusMessage(
     connection: WebSocketConnection, 
-    status: 'started' | 'stopped' | 'error', 
+    status: 'active' | 'stopped' | 'error', 
     sessionId: string, 
     pid?: number
   ): void {
@@ -239,6 +301,9 @@ export class TerminalHandler {
     }
   }
 
+  /**
+   * Send error message to WebSocket connection
+   */
   private sendErrorMessage(connection: WebSocketConnection, message: string, code: string): void {
     const errorMessage = {
       type: 'terminal_error',
@@ -251,65 +316,5 @@ export class TerminalHandler {
     if (connection.ws.readyState === 1) { // WebSocket.OPEN
       connection.ws.send(JSON.stringify(errorMessage));
     }
-  }
-
-  private trimHistory(session: TerminalSession): void {
-    if (session.history.length > this.maxHistoryLength) {
-      session.history = session.history.slice(-this.maxHistoryLength);
-    }
-  }
-
-  private cleanupInactiveSessions(): void {
-    const now = new Date();
-    const inactiveThreshold = 30 * 60 * 1000; // 30 минут
-
-    for (const [sessionId, session] of this.sessions) {
-      if (!session.isActive || (now.getTime() - session.lastActivity.getTime()) > inactiveThreshold) {
-        logger.info('Cleaning up inactive terminal session', { sessionId });
-        this.closeSession(sessionId);
-      }
-    }
-  }
-
-  // Получение статистики сессий
-  public getSessionStats(): {
-    total: number;
-    active: number;
-    sessions: Array<{
-      id: string;
-      startTime: Date;
-      lastActivity: Date;
-      isActive: boolean;
-      workingDirectory: string;
-      historyLength: number;
-    }>;
-  } {
-    const sessions = Array.from(this.sessions.values()).map(session => ({
-      id: session.id,
-      startTime: session.startTime,
-      lastActivity: session.lastActivity,
-      isActive: session.isActive,
-      workingDirectory: session.workingDirectory,
-      historyLength: session.history.length
-    }));
-
-    return {
-      total: this.sessions.size,
-      active: sessions.filter(s => s.isActive).length,
-      sessions
-    };
-  }
-
-  // Очистка всех сессий
-  public cleanup(): void {
-    logger.info('Cleaning up all terminal sessions');
-    
-    for (const session of this.sessions.values()) {
-      if (session.isActive) {
-        session.process.kill();
-      }
-    }
-    
-    this.sessions.clear();
   }
 } 

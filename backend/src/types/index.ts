@@ -51,7 +51,7 @@ export interface TerminalCommand extends BaseWebSocketMessage {
 
 export interface TerminalStatus extends BaseWebSocketMessage {
   type: 'terminal_status';
-  status: 'started' | 'stopped' | 'error';
+  status: 'started' | 'active' | 'stopped' | 'error';
   sessionId?: string;
   pid?: number;
 }

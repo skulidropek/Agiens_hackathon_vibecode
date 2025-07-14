@@ -13,10 +13,15 @@ import {
 } from '../types';
 import { FileWatcherService } from '../services/file-watcher-service';
 import { ProjectService } from '../services/project-service';
+import { TerminalHandler } from './terminal-handler';
+import { TerminalService } from '../services/terminal-service';
+import { AppConfig } from '../config/app-config';
 // import { ChatHandler } from './chat-handler';
-// import { TerminalHandler } from './terminal-handler';
 
 const connections = new Map<string, WebSocketConnection>();
+const config = new AppConfig();
+const terminalService = new TerminalService(config);
+const terminalHandler = new TerminalHandler(terminalService);
 
 // Временные заглушки для обработчиков
 const chatHandler = {
@@ -31,18 +36,6 @@ const chatHandler = {
         timestamp: new Date().toISOString()
       }));
     }
-  }
-};
-
-const terminalHandler = {
-  handleInput: async (connection: WebSocketConnection, message: TerminalInput): Promise<void> => {
-    logger.info('Terminal input received (stub)', { input: message.data });
-  },
-  handleCommand: async (connection: WebSocketConnection, message: TerminalCommand): Promise<void> => {
-    logger.info('Terminal command received (stub)', { command: message.command });
-  },
-  closeSession: (sessionId: string): void => {
-    logger.info('Terminal session closed (stub)', { sessionId });
   }
 };
 
@@ -151,8 +144,8 @@ export const setupWebSocketRoutes = (wss: WebSocketServer, projectService: Proje
       });
 
       // Завершаем терминальные сессии при закрытии соединения
-      if (connection.type === 'terminal' && connection.sessionId) {
-        terminalHandler.closeSession(connection.sessionId);
+      if (connection.type === 'terminal') {
+        terminalHandler.handleConnectionClose(connection);
       }
 
       connections.delete(connectionId);

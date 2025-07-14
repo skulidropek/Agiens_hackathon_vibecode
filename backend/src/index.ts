@@ -5,7 +5,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import dotenv from 'dotenv';
-import swaggerUi from 'swagger-ui-express';
+// import swaggerUi from 'swagger-ui-express';
 import swaggerJSDoc from 'swagger-jsdoc';
 
 import { setupWebSocketRoutes } from './websocket/websocket-handler';
@@ -15,6 +15,7 @@ import { setupProjectRoutes } from './routes/project-routes';
 import { setupProjectFileRoutes } from './routes/project-file-routes';
 import { setupAIRoutes } from './routes/ai-routes';
 import { setupProjectAIRoutes } from './routes/project-ai-routes';
+import { setupTerminalRoutes } from './routes/terminal-routes';
 import { errorHandler } from './middleware/error-handler';
 import { logger } from './utils/logger';
 import { AppConfig } from './config/app-config';
@@ -23,6 +24,7 @@ import { ProjectChatService } from './services/project-chat-service';
 import { AIService } from './services/ai-service';
 import { ProjectAIService } from './services/project-ai-service';
 import { FileWatcherService } from './services/file-watcher-service';
+import { TerminalService } from './services/terminal-service';
 
 // Загружаем переменные окружения
 dotenv.config();
@@ -54,6 +56,7 @@ const projectChatService = new ProjectChatService(projectService);
 const aiService = new AIService();
 const projectAIService = new ProjectAIService(projectService);
 const fileWatcherService = new FileWatcherService(projectService);
+const terminalService = new TerminalService(config);
 
 // Middleware
 app.use(helmet());
@@ -79,17 +82,18 @@ app.get('/api-docs/openapi.json', (req, res) => {
   res.send(swaggerSpec);
 });
 
-// Swagger UI должен быть ДО всех API-роутов
-// @ts-ignore
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+// Swagger UI setup - disabled due to TypeScript conflicts
+// app.use('/api-docs', swaggerUi.serve);
+// app.get('/api-docs', swaggerUi.setup(swaggerSpec));
 
 // Маршруты API
 app.use('/api/files', setupProjectFileRoutes(projectChatService)); // Project-aware файлы (приоритет)
-app.use('/api/files', setupFileRoutes()); // Fallback для общих файлов
-app.use('/api/chat', setupChatRoutes(projectChatService)); // Project-aware чаты
-app.use('/api/projects', setupProjectRoutes(projectService));
+app.use('/api/files', setupFileRoutes()); // Базовые файлы  
+app.use('/api/chat', setupChatRoutes(projectChatService)); // Обычные чаты
+app.use('/api/projects', setupProjectRoutes(projectService)); // Project-aware чаты
 app.use('/api/ai', setupAIRoutes(aiService)); // AI интеграция с Gemini
 app.use('/api/projects', setupProjectAIRoutes(projectAIService)); // Project AI интеграция
+app.use('/api/terminals', setupTerminalRoutes(terminalService));
 
 // Проверка здоровья сервера
 app.get('/health', (req, res) => {
@@ -121,7 +125,14 @@ server.listen(config.port, config.host, () => {
 // Graceful shutdown
 const gracefulShutdown = () => {
   logger.info('Gracefully shutting down...');
+  
+  // Clean up all terminal sessions
+  terminalService.cleanup();
+  
+  // Stop file watcher
   fileWatcherService.stopAll();
+  
+  // Close server
   server.close(() => {
     logger.info('Server closed.');
     process.exit(0);
