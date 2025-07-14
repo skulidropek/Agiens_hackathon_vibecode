@@ -368,34 +368,38 @@ const ChatPage: React.FC = () => {
 
   // Правая панель: файловый эксплорер и Monaco Editor
   const explorerPanel = (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      {projectId && (
-        <FileExplorer
-          files={fileWatcherState.files}
-          onFileSelect={handleFileSelect}
-          selectedFile={selectedFile}
-          onFileCreate={handleCreate}
-          onFileDelete={handleDelete}
-          onFileRename={handleRename}
-          fillHeight={false}
-        />
-      )}
-      {selectedFile && (
-        <div style={{ flex: 1, minHeight: 0, marginTop: 12, background: "#18181b", borderRadius: 10, boxShadow: "0 2px 12px 0 #0006" }}>
-          <MonacoEditor
-            filePath={selectedFile}
-            content={fileLoading ? "" : fileContent}
-            onContentChange={handleContentChange}
-            onSave={handleSave}
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'row' }}>
+      <div style={{ width: '300px', minWidth: '250px', borderRight: '1px solid #333', display: 'flex', flexDirection: 'column' }}>
+        {projectId && (
+          <FileExplorer
+            files={fileWatcherState.files}
+            onFileSelect={handleFileSelect}
+            selectedFile={selectedFile}
+            onFileCreate={handleCreate}
+            onFileDelete={handleDelete}
+            onFileRename={handleRename}
+            fillHeight={true}
           />
-          {fileError && <div style={{ color: '#f87171', padding: 18 }}>{fileError}</div>}
-        </div>
-      )}
-      {!selectedFile && (
-        <div style={{ flex: 1, minHeight: 0, marginTop: 12, background: '#222', borderRadius: 10, color: '#888', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontFamily: 'Fira Mono, monospace', boxShadow: '0 2px 12px 0 #0006' }}>
-          <span style={{ opacity: 0.7 }}>Выберите файл для просмотра</span>
-        </div>
-      )}
+        )}
+      </div>
+
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        {selectedFile ? (
+          <div style={{ flex: 1, minHeight: 0, background: '#18181b', borderRadius: '0 10px 10px 0' }}>
+            <MonacoEditor
+              filePath={selectedFile}
+              content={fileLoading ? "" : fileContent}
+              onContentChange={handleContentChange}
+              onSave={handleSave}
+            />
+            {fileError && <div style={{ color: '#f87171', padding: 18 }}>{fileError}</div>}
+          </div>
+        ) : (
+          <div style={{ flex: 1, minHeight: 0, background: '#1e1e1e', color: '#888', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontFamily: 'Fira Mono, monospace' }}>
+            <span style={{ opacity: 0.7 }}>Выберите файл для просмотра</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 
