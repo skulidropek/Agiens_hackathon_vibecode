@@ -6,6 +6,7 @@ export class AppConfig {
   public readonly host: string;
   public readonly corsOrigin: string | string[];
   public readonly workspaceDir: string;
+  public readonly projectsDir: string;
   public readonly geminiApiKey: string;
   public readonly jwtSecret: string;
   public readonly nodeEnv: string;
@@ -24,6 +25,8 @@ export class AppConfig {
       ? path.resolve(process.env.WORKSPACE_DIR)
       : path.join(process.cwd(), 'workspace');
     
+    this.projectsDir = path.join(this.workspaceDir, 'projects');
+
     this.geminiApiKey = process.env.GEMINI_API_KEY || '';
     this.jwtSecret = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
     this.nodeEnv = process.env.NODE_ENV || 'development';
@@ -64,5 +67,14 @@ export class AppConfig {
   public getSecureWorkspacePath(relativePath: string): string {
     const safePath = path.normalize(relativePath).replace(/^(\.\.[/\\])+/, '');
     return path.join(this.workspaceDir, safePath);
+  }
+
+  public getSecurePath(basePath: string, relativePath: string): string {
+    const resolvedPath = path.resolve(basePath, relativePath);
+    // Ensure the path is within the base directory to prevent directory traversal
+    if (!resolvedPath.startsWith(path.resolve(basePath))) {
+      throw new Error('Access to path outside of the allowed directory is forbidden.');
+    }
+    return resolvedPath;
   }
 } 

@@ -255,16 +255,22 @@ const ChatPage: React.FC = () => {
   }, []);
 
   const handleSave = useCallback(async (content: string) => {
-    if (!selectedFile) return;
+    if (!selectedFile || !projectId) {
+      setFileError('Cannot save: file or project ID is missing.');
+      return;
+    }
     
     try {
-      await fileWatcherActions.saveFileContent(selectedFile, content);
-      console.log('File saved:', selectedFile);
+      const api = new Api();
+      await api.updateFile(selectedFile, content, projectId);
+      console.log('File saved successfully via new endpoint:', selectedFile);
+      // Опционально: можно добавить логику для обновления isSaved стейта
     } catch (err) {
       console.error('Error saving file:', err);
-      setFileError(err instanceof Error ? err.message : 'Failed to save file');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save file';
+      setFileError(errorMessage);
     }
-  }, [selectedFile, fileWatcherActions]);
+  }, [selectedFile, projectId]);
 
   const handleCreate = async (parentPath: string | null, fileName: string, isDirectory: boolean) => {
     try {

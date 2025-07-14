@@ -16,8 +16,10 @@ import {
   NotFoundError, 
   ForbiddenError 
 } from '../middleware/error-handler';
+import { ProjectService } from '../services/project-service';
 
 const config = new AppConfig();
+const projectService = new ProjectService(config.workspaceDir);
 
 export const setupFileRoutes = (): Router => {
   const router = Router();
@@ -172,18 +174,18 @@ export const setupFileRoutes = (): Router => {
 
   /**
  * @openapi
- * /api/files/{path}:
+ * /api/files/project/{projectId}:
  *   post:
- *     summary: Создать или обновить файл
+ *     summary: Создать или обновить файл в проекте
  *     tags:
  *       - Files
  *     parameters:
  *       - in: path
- *         name: path
+ *         name: projectId
  *         required: true
  *         schema:
  *           type: string
- *         description: Путь к файлу
+ *         description: ID проекта
  *     requestBody:
  *       required: true
  *       content:
@@ -191,6 +193,9 @@ export const setupFileRoutes = (): Router => {
  *           schema:
  *             type: object
  *             properties:
+ *               filePath:
+ *                 type: string
+ *                 description: Путь к файлу в проекте
  *               content:
  *                 type: string
  *               encoding:
@@ -213,59 +218,60 @@ export const setupFileRoutes = (): Router => {
  *                 timestamp:
  *                   type: string
  */
-  router.post('/:path(*)', asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const relativePath = req.params.path;
-    const { content, encoding = 'utf-8' } = req.body;
+  router.post('/project/:projectId', asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { projectId } = req.params;
+    const { filePath, content, encoding = 'utf-8' } = req.body;
 
-    if (!relativePath) {
-      throw new ValidationError('Path parameter is required', 'path');
+    if (!projectId) {
+      throw new ValidationError('Project ID is required', 'projectId');
     }
-
+    if (!filePath) {
+      throw new ValidationError('File path is required', 'filePath');
+    }
     if (content === undefined) {
       throw new ValidationError('Content is required', 'content');
     }
 
-    const safePath = config.getSecureWorkspacePath(relativePath);
+    const project = await projectService.getProject(projectId);
+    if (!project) {
+      throw new NotFoundError('Project', projectId);
+    }
     
-    logger.info('Creating/updating file', { path: safePath });
+    const safeFilePath = config.getSecurePath(project.path, filePath);
+    logger.info('Creating/updating project file', { projectId, path: safeFilePath });
 
-    // Проверяем расширение файла
-    if (!config.isAllowedFileExtension(safePath)) {
+    if (!config.isAllowedFileExtension(safeFilePath)) {
       throw new ForbiddenError('File type not allowed');
     }
 
-    // Создаем директорию если она не существует
-    const dirPath = path.dirname(safePath);
+    const dirPath = path.dirname(safeFilePath);
     await fs.mkdir(dirPath, { recursive: true });
 
-    // Определяем тип операции
-    const fileExists = await fs.access(safePath).then(() => true).catch(() => false);
+    const fileExists = await fs.access(safeFilePath).then(() => true).catch(() => false);
     const operationType: FileOperation['type'] = fileExists ? 'update' : 'create';
 
-    // Записываем файл
-    await fs.writeFile(safePath, content, encoding);
+    await fs.writeFile(safeFilePath, content, encoding);
 
-    const stats = await stat(safePath);
+    const stats = await stat(safeFilePath);
     const fileInfo: FileInfo = {
-      name: path.basename(safePath),
-      path: relativePath,
-      size: stats.size,
+      name: path.basename(safeFilePath),
+      path: filePath, // Возвращаем относительный путь
       type: 'file',
-      extension: path.extname(safePath),
+      size: stats.size,
       modifiedAt: stats.mtime.toISOString(),
       createdAt: stats.birthtime.toISOString(),
       isReadable: true,
-      isWritable: true
+      isWritable: true,
     };
 
     const response: ApiResponse<FileInfo> = {
       success: true,
       data: fileInfo,
-      message: `File ${operationType}d successfully`,
-      timestamp: new Date().toISOString()
+      message: `File ${operationType === 'create' ? 'created' : 'updated'} successfully`,
+      timestamp: new Date().toISOString(),
     };
 
-    res.json(response);
+    res.status(operationType === 'create' ? 201 : 200).json(response);
   }));
 
   /**

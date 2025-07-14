@@ -672,4 +672,13 @@ export class Api<
       method: "DELETE",
       ...params,
     });
+
+  updateFile = (filePath: string, content: string, projectId: string) => {
+    return this.request<any, any>({
+      path: `/api/files/project/${projectId}`,
+      method: "POST",
+      body: { filePath, content },
+      type: ContentType.Json,
+    });
+  }
 }
