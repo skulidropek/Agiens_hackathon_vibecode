@@ -11,6 +11,7 @@
     "generate-api": "swagger-typescript-api generate -p http://localhost:3000/api-docs/openapi.json -o src/api/Api.ts -n Api"
   },
   "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^6.30.1"

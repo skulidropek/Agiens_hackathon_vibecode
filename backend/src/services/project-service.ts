@@ -139,8 +139,20 @@ export class ProjectService {
     };
   }
 
-  async getProject(id: string): Promise<Project | undefined> {
-    return this.projects.get(id);
+  async getProject(idOrName: string): Promise<Project | undefined> {
+    // First, try to find by ID, which is the most efficient lookup.
+    if (this.projects.has(idOrName)) {
+      return this.projects.get(idOrName);
+    }
+
+    // If not found by ID, search by name. This is less efficient but necessary.
+    for (const project of this.projects.values()) {
+      if (project.name === idOrName) {
+        return project;
+      }
+    }
+
+    return undefined;
   }
 
   async deleteProject(id: string): Promise<boolean> {

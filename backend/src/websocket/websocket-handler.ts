@@ -7,8 +7,12 @@ import {
   ChatMessage, 
   TerminalInput, 
   TerminalCommand,
-  WebSocketLike 
+  WebSocketLike,
+  FileWatchStart,
+  FileWatchStop
 } from '../types';
+import { FileWatcherService } from '../services/file-watcher-service';
+import { ProjectService } from '../services/project-service';
 // import { ChatHandler } from './chat-handler';
 // import { TerminalHandler } from './terminal-handler';
 
@@ -42,7 +46,7 @@ const terminalHandler = {
   }
 };
 
-export const setupWebSocketRoutes = (wss: WebSocketServer): void => {
+export const setupWebSocketRoutes = (wss: WebSocketServer, projectService: ProjectService, fileWatcherService: FileWatcherService): void => {
   wss.on('connection', (ws, req) => {
     const connectionId = uuidv4();
     const url = new URL(req.url || '', `http://${req.headers.host}`);
@@ -110,6 +114,14 @@ export const setupWebSocketRoutes = (wss: WebSocketServer): void => {
           
           case 'terminal_command':
             await handleTerminalCommand(connection, message as TerminalCommand);
+            break;
+          
+          case 'file_watch_start':
+            await handleFileWatchStart(connection, message as FileWatchStart, fileWatcherService);
+            break;
+          
+          case 'file_watch_stop':
+            await handleFileWatchStop(connection, message as FileWatchStop, fileWatcherService);
             break;
           
           default:
@@ -281,6 +293,76 @@ async function handleTerminalCommand(connection: WebSocketConnection, message: T
     });
     
     sendErrorMessage(connection.ws, 'Failed to process terminal command', 'TERMINAL_ERROR');
+  }
+}
+
+// Обработка запуска файлового watcher
+async function handleFileWatchStart(connection: WebSocketConnection, message: FileWatchStart, fileWatcherService: FileWatcherService): Promise<void> {
+  try {
+    if (connection.type !== 'files') {
+      throw new Error('File watch messages only allowed on files connections');
+    }
+
+    logger.info('Starting file watch', {
+      connectionId: connection.id,
+      projectId: message.projectId,
+    });
+
+    // Запускаем watcher для проекта
+    await fileWatcherService.startWatching({
+      projectId: message.projectId,
+      connectionId: connection.id,
+      ignoreInitial: false
+    });
+
+    // Отправляем подтверждение
+    sendMessage(connection.ws, {
+      type: 'file_watch_started',
+      projectId: message.projectId,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    logger.error('Error starting file watch', {
+      connectionId: connection.id,
+      projectId: message.projectId,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    
+    sendErrorMessage(connection.ws, 'Failed to start file watch', 'FILE_WATCH_ERROR');
+  }
+}
+
+// Обработка остановки файлового watcher
+async function handleFileWatchStop(connection: WebSocketConnection, message: FileWatchStop, fileWatcherService: FileWatcherService): Promise<void> {
+  try {
+    if (connection.type !== 'files') {
+      throw new Error('File watch messages only allowed on files connections');
+    }
+
+    logger.info('Stopping file watch', {
+      connectionId: connection.id,
+      projectId: message.projectId,
+    });
+
+    // Останавливаем watcher для проекта
+    fileWatcherService.stopWatching(message.projectId);
+
+    // Отправляем подтверждение
+    sendMessage(connection.ws, {
+      type: 'file_watch_stopped',
+      projectId: message.projectId,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    logger.error('Error stopping file watch', {
+      connectionId: connection.id,
+      projectId: message.projectId,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    
+    sendErrorMessage(connection.ws, 'Failed to stop file watch', 'FILE_WATCH_ERROR');
   }
 }
 

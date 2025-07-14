@@ -320,6 +320,25 @@ export interface ChatEvent extends AppEvent {
 }
 
 // Utility types
+// Типы для файлового watcher
+export interface FileWatchStart extends BaseWebSocketMessage {
+  type: 'file_watch_start';
+  projectId: string;
+}
+
+export interface FileWatchStop extends BaseWebSocketMessage {
+  type: 'file_watch_stop';
+  projectId: string;
+}
+
+export interface FileWatchMessage extends BaseWebSocketMessage {
+  type: 'file_event';
+  eventType: string;
+  projectId: string;
+  filePath: string;
+  data: Record<string, unknown>;
+}
+
 export type WebSocketMessageType = 
   | ChatMessage 
   | ChatResponse 
@@ -328,6 +347,9 @@ export type WebSocketMessageType =
   | TerminalInput 
   | TerminalCommand 
   | TerminalStatus 
-  | FileChange;
+  | FileChange
+  | FileWatchStart
+  | FileWatchStop
+  | FileWatchMessage;
 
 export type EventType = FileWatchEvent | TerminalEvent | ChatEvent; 

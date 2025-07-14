@@ -452,10 +452,24 @@ function isAllowedFileExtension(filename: string): boolean {
     '.js', '.ts', '.jsx', '.tsx', '.json', '.html', '.css', '.scss', '.sass',
     '.vue', '.py', '.java', '.cpp', '.c', '.h', '.hpp', '.rs', '.go', '.php',
     '.rb', '.swift', '.kt', '.dart', '.sh', '.bash', '.zsh', '.fish', '.ps1',
-    '.md', '.txt', '.yml', '.yaml', '.xml', '.toml', '.ini', '.env', '.gitignore',
+    '.md', '.txt', '.yml', '.yaml', '.xml', '.toml', '.ini', '.env',
     '.dockerfile', '.dockerignore', '.sql', '.graphql', '.proto', '.lock'
   ];
   
+  const specialFiles = [
+    '.gitignore', '.gitkeep', '.dockerignore', '.editorconfig', '.prettierrc',
+    '.eslintrc', '.babelrc', '.nvmrc', 'Dockerfile', 'Makefile', 'README',
+    'LICENSE', 'CHANGELOG', 'requirements.txt', 'package.json', 'tsconfig.json'
+  ];
+  
+  const basename = path.basename(filename).toLowerCase();
   const ext = path.extname(filename).toLowerCase();
+  
+  // Проверяем специальные файлы по полному имени
+  if (specialFiles.includes(basename)) {
+    return true;
+  }
+  
+  // Проверяем расширения
   return allowedExtensions.includes(ext);
 } 

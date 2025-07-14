@@ -1,0 +1,201 @@
+.editorContainer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: #1e1e1e;
+  color: #e0e0e0;
+  font-family: 'Fira Code', 'Monaco', 'Menlo', monospace;
+}
+
+.editorHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background-color: #2d2d2d;
+  border-bottom: 1px solid #3c3c3c;
+  min-height: 40px;
+}
+
+.fileInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.fileIcon {
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+}
+
+.fileName {
+  font-size: 13px;
+  font-weight: 500;
+  color: #e0e0e0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
+}
+
+.unsavedIndicator {
+  color: #f87171;
+  font-size: 16px;
+  margin-left: 4px;
+}
+
+.editorActions {
+  display: flex;
+  gap: 8px;
+}
+
+.actionButton {
+  background-color: #404040;
+  border: 1px solid #555;
+  color: #e0e0e0;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.actionButton:hover:not(:disabled) {
+  background-color: #4a4a4a;
+  border-color: #666;
+}
+
+.actionButton:disabled {
+  background-color: #2a2a2a;
+  border-color: #333;
+  color: #666;
+  cursor: not-allowed;
+}
+
+.saveButton {
+  background-color: #0d7377;
+  border-color: #0f8a8f;
+}
+
+.saveButton:hover:not(:disabled) {
+  background-color: #0f8a8f;
+  border-color: #14a1a7;
+}
+
+.saveButton:disabled {
+  background-color: #2a2a2a;
+  border-color: #333;
+}
+
+.editorWrapper {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  color: #888;
+  font-size: 14px;
+}
+
+.loadingSpinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #333;
+  border-top: 3px solid #0d7377;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.noFileSelected {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background-color: #1e1e1e;
+  color: #666;
+  gap: 16px;
+}
+
+.noFileIcon {
+  font-size: 48px;
+  opacity: 0.5;
+}
+
+.noFileText {
+  font-size: 16px;
+  font-weight: 500;
+  opacity: 0.7;
+}
+
+/* Monaco Editor theme overrides */
+.editorWrapper :global(.monaco-editor) {
+  background-color: #1e1e1e !important;
+}
+
+.editorWrapper :global(.monaco-editor .margin) {
+  background-color: #1e1e1e !important;
+}
+
+.editorWrapper :global(.monaco-editor .monaco-editor-background) {
+  background-color: #1e1e1e !important;
+}
+
+.editorWrapper :global(.monaco-editor .current-line) {
+  background-color: #2a2a2a !important;
+}
+
+.editorWrapper :global(.monaco-editor .line-numbers) {
+  color: #666 !important;
+}
+
+.editorWrapper :global(.monaco-editor .minimap) {
+  background-color: #1a1a1a !important;
+}
+
+.editorWrapper :global(.monaco-scrollable-element > .scrollbar) {
+  background-color: #2a2a2a !important;
+}
+
+.editorWrapper :global(.monaco-scrollable-element > .scrollbar > .slider) {
+  background-color: #444 !important;
+}
+
+.editorWrapper :global(.monaco-scrollable-element > .scrollbar > .slider:hover) {
+  background-color: #555 !important;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .editorHeader {
+    padding: 6px 12px;
+  }
+  
+  .fileName {
+    max-width: 200px;
+  }
+  
+  .actionButton {
+    padding: 3px 8px;
+    font-size: 11px;
+  }
+} 

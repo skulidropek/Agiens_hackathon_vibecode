@@ -15,7 +15,7 @@ export class AppConfig {
 
   constructor() {
     this.port = parseInt(process.env.PORT || '3000', 10);
-    this.host = process.env.HOST || 'localhost';
+    this.host = process.env.HOST || '0.0.0.0';
     this.corsOrigin = process.env.CORS_ORIGIN 
       ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
       : ['http://localhost:3000', 'http://localhost:5173'];

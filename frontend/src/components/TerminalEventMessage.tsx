@@ -9,7 +9,6 @@ interface ChatMessage {
 }
 
 const TerminalEventMessage: React.FC<{ message: ChatMessage }> = ({ message }) => {
-  console.log('[TerminalEventMessage] message:', message);
   let parsed: unknown = null;
   try {
     parsed = JSON.parse(message.content);

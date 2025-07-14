@@ -22,6 +22,7 @@ import { ProjectService } from './services/project-service';
 import { ProjectChatService } from './services/project-chat-service';
 import { AIService } from './services/ai-service';
 import { ProjectAIService } from './services/project-ai-service';
+import { FileWatcherService } from './services/file-watcher-service';
 
 // Загружаем переменные окружения
 dotenv.config();
@@ -52,12 +53,13 @@ const projectService = new ProjectService(config.workspaceDir);
 const projectChatService = new ProjectChatService(projectService);
 const aiService = new AIService();
 const projectAIService = new ProjectAIService(projectService);
+const fileWatcherService = new FileWatcherService(projectService);
 
 // Middleware
 app.use(helmet());
 app.use(compression());
 app.use(cors({
-  origin: config.corsOrigin,
+  origin: '*', // Настройте для продакшена
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -66,6 +68,8 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Логирование запросов
 app.use((req, res, next) => {
   logger.info(`${req.method} ${req.path} - ${req.ip}`);
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
   next();
 });
 
@@ -105,7 +109,7 @@ const wss = new WebSocketServer({
   path: '/ws' 
 });
 
-setupWebSocketRoutes(wss);
+setupWebSocketRoutes(wss, projectService, fileWatcherService);
 
 // Запуск сервера
 server.listen(config.port, config.host, () => {
@@ -115,20 +119,16 @@ server.listen(config.port, config.host, () => {
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('Получен сигнал SIGTERM. Завершаю работу...');
+const gracefulShutdown = () => {
+  logger.info('Gracefully shutting down...');
+  fileWatcherService.stopAll();
   server.close(() => {
-    logger.info('Сервер остановлен');
+    logger.info('Server closed.');
     process.exit(0);
   });
-});
+};
 
-process.on('SIGINT', () => {
-  logger.info('Получен сигнал SIGINT. Завершаю работу...');
-  server.close(() => {
-    logger.info('Сервер остановлен');
-    process.exit(0);
-  });
-});
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
 
 export { app, server, wss }; 

@@ -5,8 +5,9 @@ import type { RequestParams } from "../api/http-client";
 import styles from "./ChatPage.module.css";
 import ToolEventRenderer from "./ToolEventRenderer";
 import SplitPanelLayout from "./SplitPanelLayout";
-import FileExplorer from "./FileExplorer";
-import FileViewer from "./FileViewer";
+import { FileExplorer } from "./FileExplorer";
+import { MonacoEditor } from "./MonacoEditor";
+import { useFileWatcher } from "../hooks/useFileWatcher";
 
 interface ChatMessage {
   id: string;
@@ -37,11 +38,27 @@ const ChatPage: React.FC = () => {
   const [streamingAI, setStreamingAI] = useState<string>("");
   const [streaming, setStreaming] = useState<boolean>(false);
 
-  // File explorer state
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [fileContent, setFileContent] = useState<string | undefined>(undefined);
+  // File system state
+  const [selectedFile, setSelectedFile] = useState<string>("");
+  const [fileContent, setFileContent] = useState<string>("");
   const [fileLoading, setFileLoading] = useState(false);
-  const [fileError, setFileError] = useState("");
+  const [fileError, setFileError] = useState<string | null>(null);
+  const { state: fileWatcherState, actions: fileWatcherActions } = useFileWatcher();
+
+  // Initialize file watcher when project is available
+  useEffect(() => {
+    if (projectId && fileWatcherState.isConnected) {
+      console.log('Starting file watcher for project:', projectId);
+      fileWatcherActions.startWatching(projectId);
+
+      return () => {
+        if (projectId) {
+          console.log('Stopping file watcher for project:', projectId);
+          fileWatcherActions.stopWatching(projectId);
+        }
+      };
+    }
+  }, [projectId, fileWatcherState.isConnected, fileWatcherActions]);
 
   useEffect(() => {
     if (!projectId && sessionId) {
@@ -213,40 +230,71 @@ const ChatPage: React.FC = () => {
     }
   };
 
-  // File explorer logic
+  // File system handlers
   const handleFileSelect = useCallback(async (filePath: string) => {
-    setSelectedFile(filePath);
-    setFileContent(undefined);
+    if (!filePath || !projectId) return;
+
     setFileLoading(true);
-    setFileError("");
+    setFileError(null);
+
     try {
-      if (!projectId) return;
-      const api = new Api();
-      const res = await api.filesProjectDetail2(projectId, filePath);
-      let content = "";
-      if (Array.isArray(res.data)) {
-        content = res.data.join("\n");
-      } else if (typeof res.data === "string") {
-        content = res.data;
-      } else if (res.data && typeof res.data.data === "string") {
-        content = res.data.data;
-      } else if (res.data && Array.isArray(res.data.data)) {
-        content = res.data.data.join("\n");
-      }
+      console.log('Loading file:', filePath);
+      const content = await fileWatcherActions.getFileContent(filePath, projectId);
+      setSelectedFile(filePath);
       setFileContent(content);
-    } catch {
-      setFileError("Ошибка загрузки файла");
-      setFileContent(undefined);
+    } catch (err) {
+      console.error('Error loading file:', err);
+      setFileError(err instanceof Error ? err.message : 'Failed to load file');
     } finally {
       setFileLoading(false);
     }
-  }, [projectId]);
+  }, [fileWatcherActions, projectId]);
 
-  const handleCloseViewer = useCallback(() => {
-    setSelectedFile(null);
-    setFileContent(undefined);
-    setFileError("");
+  const handleContentChange = useCallback((content: string) => {
+    setFileContent(content);
   }, []);
+
+  const handleSave = useCallback(async (content: string) => {
+    if (!selectedFile) return;
+    
+    try {
+      await fileWatcherActions.saveFileContent(selectedFile, content);
+      console.log('File saved:', selectedFile);
+    } catch (err) {
+      console.error('Error saving file:', err);
+      setFileError(err instanceof Error ? err.message : 'Failed to save file');
+    }
+  }, [selectedFile, fileWatcherActions]);
+
+  const handleCreate = async (parentPath: string | null, fileName: string, isDirectory: boolean) => {
+    try {
+      const fullPath = parentPath ? `${parentPath}/${fileName}` : fileName;
+      await fileWatcherActions.createFile(fullPath, isDirectory);
+    } catch (err) {
+      console.error('Failed to create item', err);
+    }
+  };
+
+  const handleDelete = async (path: string) => {
+    if (window.confirm(`Are you sure you want to delete ${path}?`)) {
+      try {
+        await fileWatcherActions.deleteFile(path);
+      } catch (err) {
+        console.error('Error deleting file:', err);
+        setFileError(err instanceof Error ? err.message : 'Failed to delete file');
+      }
+    }
+  };
+
+  const handleRename = async (oldPath: string, newPath: string) => {
+    if (!projectId) return;
+    
+    try {
+      await fileWatcherActions.renameFile(oldPath, newPath, projectId);
+    } catch (error) {
+      console.error('Error renaming file:', error);
+    }
+  };
 
   // Левая панель: чат + инструменты (все сообщения)
   const chatPanel = (
@@ -318,23 +366,32 @@ const ChatPage: React.FC = () => {
     </div>
   );
 
-  // Правая панель: только файловый эксплорер и предпросмотр
+  // Правая панель: файловый эксплорер и Monaco Editor
   const explorerPanel = (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       {projectId && (
-        <FileExplorer projectId={projectId} onFileSelect={(filePath) => { handleFileSelect(filePath); }} />
+        <FileExplorer
+          files={fileWatcherState.files}
+          onFileSelect={handleFileSelect}
+          selectedFile={selectedFile}
+          onFileCreate={handleCreate}
+          onFileDelete={handleDelete}
+          onFileRename={handleRename}
+          fillHeight={false}
+        />
       )}
-      {selectedFile ? (
+      {selectedFile && (
         <div style={{ flex: 1, minHeight: 0, marginTop: 12, background: "#18181b", borderRadius: 10, boxShadow: "0 2px 12px 0 #0006" }}>
-          <FileViewer
+          <MonacoEditor
             filePath={selectedFile}
-            content={fileLoading ? undefined : fileContent}
-            onClose={() => { handleCloseViewer(); }}
-            inline
+            content={fileLoading ? "" : fileContent}
+            onContentChange={handleContentChange}
+            onSave={handleSave}
           />
           {fileError && <div style={{ color: '#f87171', padding: 18 }}>{fileError}</div>}
         </div>
-      ) : (
+      )}
+      {!selectedFile && (
         <div style={{ flex: 1, minHeight: 0, marginTop: 12, background: '#222', borderRadius: 10, color: '#888', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontFamily: 'Fira Mono, monospace', boxShadow: '0 2px 12px 0 #0006' }}>
           <span style={{ opacity: 0.7 }}>Выберите файл для просмотра</span>
         </div>

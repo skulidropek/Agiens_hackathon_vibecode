@@ -112,6 +112,14 @@ const SessionListPage: React.FC = () => {
           <div className={styles.codexTaskFormActions}>
             <button type="button" className={styles.codexBtn}>Ask</button>
             <button type="submit" className={styles.codexBtn}>Code</button>
+            <button 
+              type="button" 
+              className={styles.codexBtn}
+              onClick={() => navigate(`/workspace/${selectedProject}`)}
+              disabled={!selectedProject}
+            >
+              Workspace
+            </button>
           </div>
         </form>
       </div>

@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { AppConfig } from '../config/app-config';
 
 describe('AppConfig', () => {
@@ -18,7 +19,7 @@ describe('AppConfig', () => {
   describe('constructor', () => {
     it('should use default values when env variables are not set', () => {
       expect(config.port).toBe(3000);
-      expect(config.host).toBe('localhost');
+      expect(config.host).toBe('0.0.0.0');
       expect(config.nodeEnv).toBe('test'); // В тестовом окружении NODE_ENV='test'
       expect(config.logLevel).toBe('silent'); // В тестовом окружении LOG_LEVEL='silent'
     });
