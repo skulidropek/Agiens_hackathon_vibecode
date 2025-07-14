@@ -78,3 +78,12 @@ export class AppConfig {
     return resolvedPath;
   }
 } 
+
+let configInstance: AppConfig;
+
+export const loadConfig = (): AppConfig => {
+  if (!configInstance) {
+    configInstance = new AppConfig();
+  }
+  return configInstance;
+}; 

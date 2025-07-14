@@ -2,6 +2,7 @@ import { spawn, IPty } from 'node-pty';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger';
 import { AppConfig } from '../config/app-config';
+import path from 'path';
 
 export interface TerminalSession {
   id: string;
@@ -368,7 +369,12 @@ export class TerminalService {
    */
   private getProjectWorkingDirectory(_projectId: string): string {
     // This should ideally use ProjectService to get the actual project path
-    return this.config.workspaceDir;
+    const projectPath = path.join(this.config.workspaceDir, _projectId);
+    // Basic security check to prevent path traversal
+    if (!path.resolve(projectPath).startsWith(path.resolve(this.config.workspaceDir))) {
+        throw new Error(`Invalid projectId leading to path traversal: ${_projectId}`);
+    }
+    return projectPath;
   }
 
   /**
