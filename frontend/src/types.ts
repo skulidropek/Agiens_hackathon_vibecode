@@ -12,46 +12,17 @@ export interface FileInfo {
 
 // --- WebSocket Commands (Client -> Server) ---
 
-export interface FileWatchStartCommand {
-  type: 'file_watch_start';
-  projectId: string;
-}
-
-export interface FileWatchStopCommand {
-  type: 'file_watch_stop';
-  projectId: string;
-}
-
-export interface FileSaveContentCommand {
-  type: 'file_save_content';
-  filePath: string;
-  content: string;
-}
-
-export interface FileCreateCommand {
-  type: 'file_create';
-  filePath: string;
-  content: string;
-}
-
-export interface FileDeleteCommand {
-  type: 'file_delete';
-  filePath: string;
-}
-
-export interface FileRenameCommand {
-  type: 'file_rename';
-  oldPath: string;
-  newPath: string;
-}
-
 export type WebSocketCommand =
-  | FileWatchStartCommand
-  | FileWatchStopCommand
-  | FileSaveContentCommand
-  | FileCreateCommand
-  | FileDeleteCommand
-  | FileRenameCommand;
+  | { type: 'file_watch_start'; payload: { projectId: string } }
+  | { type: 'file_watch_stop'; payload: { projectId: string } }
+  | { type: 'file_save_content'; payload: { filePath: string; content: string } }
+  | { type: 'file_create'; payload: { filePath: string; content?: string } }
+  | { type: 'file_delete'; payload: { filePath: string } }
+  | { type: 'file_rename'; payload: { oldPath: string; newPath: string } }
+  | { type: 'subscribe_terminal'; payload: { terminalId: string } }
+  | { type: 'unsubscribe_terminal'; payload: { terminalId: string } }
+  | { type: 'terminal_input'; payload: { terminalId: string; data: string } }
+  | { type: 'terminal_resize'; payload: { terminalId: string; cols: number; rows: number } };
 
 // --- WebSocket Messages (Server -> Client) ---
 
@@ -87,8 +58,29 @@ export interface FileEventMessage {
   };
 }
 
+export interface FileUpdatePayload {
+  path: string;
+  content: string;
+  timestamp: number;
+}
+
+export interface TerminalOutputMessage {
+  type: 'terminal_output';
+  terminalId: string;
+  data: string;
+}
+
+export interface TerminalEventMessage {
+  type: 'terminal_event';
+  terminalId: string;
+  event: string;
+  data?: unknown;
+}
+
 export type WebSocketMessage =
   | ConnectionEstablishedMessage
   | FileWatchStartedMessage
   | ErrorMessage
-  | FileEventMessage; 
+  | FileEventMessage
+  | TerminalOutputMessage
+  | TerminalEventMessage; 

@@ -6,6 +6,7 @@ import { PathManager } from '../utils/path-manager';
 import { RetryUtils } from '../utils/retry-utils';
 import { GeminiChat } from '@google/gemini-cli-core/dist/src/core/geminiChat';
 import { ToolRegistry } from '@google/gemini-cli-core/dist/src/tools/tool-registry';
+import { AIContext } from '../types';
 
 export interface AIServiceOptions {
   sessionId: string;
@@ -18,6 +19,7 @@ export interface AIServiceOptions {
   userMemory?: string;
   fullContext?: boolean;
   projectPath?: string;
+  aiContext?: AIContext; // Добавляем поддержку AI контекста
 }
 
 export interface AIResponse {
@@ -242,7 +244,26 @@ export class AIService {
 
       const chat = await geminiClient.getChat();
       const abortController = new AbortController();
-      const currentMessages: Content[] = [{ role: 'user', parts: [{ text: input }] }];
+      
+      // Создаем сообщения с учетом истории чата
+      const currentMessages: Content[] = [];
+      
+      // Добавляем историю чата, если есть
+      if (options.aiContext?.chatHistory && options.aiContext.chatHistory.length > 0) {
+        logger.info(`Adding ${options.aiContext.chatHistory.length} messages from chat history to context`);
+        
+        // Конвертируем историю чата в формат Content
+        for (const msg of options.aiContext.chatHistory) {
+          currentMessages.push({
+            role: msg.sender === 'user' ? 'user' : 'model',
+            parts: [{ text: msg.content }]
+          });
+        }
+      }
+      
+      // Добавляем текущее сообщение пользователя
+      currentMessages.push({ role: 'user', parts: [{ text: input }] });
+      
       const turnCount = 0;
       const responseText = '';
       const toolCalls: Array<{

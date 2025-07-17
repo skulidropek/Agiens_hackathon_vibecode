@@ -15,29 +15,17 @@ import { FileWatcherService } from '../services/file-watcher-service';
 import { ProjectService } from '../services/project-service';
 import { TerminalHandler } from './terminal-handler';
 import { TerminalService } from '../services/terminal-service';
+import { ChatHandler } from './chat-handler';
+import { ProjectChatService } from '../services/project-chat-service';
 import { AppConfig } from '../config/app-config';
-// import { ChatHandler } from './chat-handler';
 
 const connections = new Map<string, WebSocketConnection>();
 const config = new AppConfig();
-const terminalService = new TerminalService(config);
+const projectService = new ProjectService(config.workspaceDir);
+const projectChatService = new ProjectChatService(projectService);
+const terminalService = new TerminalService(config, projectService);
 const terminalHandler = new TerminalHandler(terminalService);
-
-// Временные заглушки для обработчиков
-const chatHandler = {
-  processMessage: async (connection: WebSocketConnection, message: ChatMessage): Promise<void> => {
-    logger.info('Chat message received (stub)', { message: message.content });
-    // Заглушка - просто отправляем подтверждение
-    if (connection.ws.readyState === connection.ws.OPEN) {
-      connection.ws.send(JSON.stringify({
-        type: 'chat_response',
-        content: `Получено сообщение: ${message.content}`,
-        sender: 'ai',
-        timestamp: new Date().toISOString()
-      }));
-    }
-  }
-};
+const chatHandler = new ChatHandler(projectChatService);
 
 export const setupWebSocketRoutes = (wss: WebSocketServer, projectService: ProjectService, fileWatcherService: FileWatcherService): void => {
   wss.on('connection', (ws, req) => {
@@ -102,11 +90,28 @@ export const setupWebSocketRoutes = (wss: WebSocketServer, projectService: Proje
             break;
           
           case 'terminal_input':
-            await handleTerminalInput(connection, message as TerminalInput);
+            // Проверяем формат сообщения: если есть payload, используем новый обработчик
+            if ('payload' in message && typeof message.payload === 'object' && message.payload !== null) {
+              await handleTerminalInputWithPayload(connection, message as { type: string; payload: { terminalId: string; data: string } });
+            } else {
+              await handleTerminalInput(connection, message as TerminalInput);
+            }
             break;
           
           case 'terminal_command':
             await handleTerminalCommand(connection, message as TerminalCommand);
+            break;
+          
+          case 'subscribe_terminal':
+            await handleTerminalSubscription(connection, message as { type: string; payload: { terminalId: string } });
+            break;
+          
+          case 'unsubscribe_terminal':
+            await handleTerminalUnsubscription(connection, message as { type: string; payload: { terminalId: string } });
+            break;
+          
+          case 'terminal_resize':
+            await handleTerminalResize(connection, message as { type: string; payload: { terminalId: string; cols: number; rows: number } });
             break;
           
           case 'file_watch_start':
@@ -231,6 +236,45 @@ async function handleChatMessage(connection: WebSocketConnection, message: ChatM
   }
 }
 
+// Обработка ввода в терминал через payload
+async function handleTerminalInputWithPayload(connection: WebSocketConnection, message: { type: string; payload: { terminalId: string; data: string } }): Promise<void> {
+  try {
+    const { terminalId, data } = message.payload;
+    
+    if (!terminalId) {
+      throw new Error('Terminal ID required for terminal input');
+    }
+
+    logger.debug('Processing terminal input via payload', {
+      connectionId: connection.id,
+      terminalId,
+      dataLength: data.length
+    });
+
+    // Создаем объект в формате TerminalInput для передачи в terminalHandler
+    const terminalInput: TerminalInput = {
+      type: 'terminal_input',
+      sessionId: terminalId,
+      data,
+      timestamp: new Date().toISOString(),
+      id: `terminal-input-${Date.now()}`
+    };
+
+    // Подписываем соединение на терминал если еще не подписано
+    terminalHandler.subscribeToSession(terminalId, connection);
+
+    await terminalHandler.handleInput(connection, terminalInput);
+
+  } catch (error) {
+    logger.error('Error handling terminal input with payload', {
+      connectionId: connection.id,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    
+    sendErrorMessage(connection.ws, 'Failed to process terminal input', 'TERMINAL_ERROR');
+  }
+}
+
 // Обработка ввода в терминал
 async function handleTerminalInput(connection: WebSocketConnection, message: TerminalInput): Promise<void> {
   try {
@@ -289,6 +333,118 @@ async function handleTerminalCommand(connection: WebSocketConnection, message: T
   }
 }
 
+// Обработка подписки на терминал
+async function handleTerminalSubscription(connection: WebSocketConnection, message: { type: string; payload: { terminalId: string } }): Promise<void> {
+  try {
+    const { terminalId } = message.payload;
+    
+    if (!terminalId) {
+      throw new Error('Terminal ID required for subscription');
+    }
+
+    logger.info('Processing terminal subscription', {
+      connectionId: connection.id,
+      terminalId
+    });
+
+    // Подписываем соединение на терминал
+    terminalHandler.subscribeToSession(terminalId, connection);
+
+    // Отправляем подтверждение
+    sendMessage(connection.ws, {
+      type: 'terminal_event',
+      terminalId,
+      event: 'subscribed',
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    logger.error('Error handling terminal subscription', {
+      connectionId: connection.id,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    
+    sendErrorMessage(connection.ws, 'Failed to subscribe to terminal', 'TERMINAL_ERROR');
+  }
+}
+
+// Обработка отписки от терминала
+async function handleTerminalUnsubscription(connection: WebSocketConnection, message: { type: string; payload: { terminalId: string } }): Promise<void> {
+  try {
+    const { terminalId } = message.payload;
+    
+    if (!terminalId) {
+      throw new Error('Terminal ID required for unsubscription');
+    }
+
+    logger.info('Processing terminal unsubscription', {
+      connectionId: connection.id,
+      terminalId
+    });
+
+    // Отписываем соединение от терминала
+    terminalHandler.unsubscribeFromSession(terminalId, connection);
+
+    // Отправляем подтверждение
+    sendMessage(connection.ws, {
+      type: 'terminal_event',
+      terminalId,
+      event: 'unsubscribed',
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    logger.error('Error handling terminal unsubscription', {
+      connectionId: connection.id,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    
+    sendErrorMessage(connection.ws, 'Failed to unsubscribe from terminal', 'TERMINAL_ERROR');
+  }
+}
+
+// Обработка изменения размера терминала
+async function handleTerminalResize(connection: WebSocketConnection, message: { type: string; payload: { terminalId: string; cols: number; rows: number } }): Promise<void> {
+  try {
+    const { terminalId, cols, rows } = message.payload;
+    
+    if (!terminalId) {
+      throw new Error('Terminal ID required for resize');
+    }
+
+    if (!cols || !rows || cols < 1 || rows < 1) {
+      throw new Error('Valid cols and rows required for resize');
+    }
+
+    logger.info('Processing terminal resize', {
+      connectionId: connection.id,
+      terminalId,
+      cols,
+      rows
+    });
+
+    // Изменяем размер терминала
+    await terminalHandler.handleResize(connection, terminalId, cols, rows);
+
+    // Отправляем подтверждение
+    sendMessage(connection.ws, {
+      type: 'terminal_event',
+      terminalId,
+      event: 'resized',
+      data: { cols, rows },
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    logger.error('Error handling terminal resize', {
+      connectionId: connection.id,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    
+    sendErrorMessage(connection.ws, 'Failed to resize terminal', 'TERMINAL_ERROR');
+  }
+}
+
 // Обработка запуска файлового watcher
 async function handleFileWatchStart(connection: WebSocketConnection, message: FileWatchStart, fileWatcherService: FileWatcherService): Promise<void> {
   try {
@@ -296,14 +452,21 @@ async function handleFileWatchStart(connection: WebSocketConnection, message: Fi
       throw new Error('File watch messages only allowed on files connections');
     }
 
+    // Извлекаем projectId из payload (совместимость с фронтендом)
+    const projectId = (message as unknown as {payload?: {projectId?: string}}).payload?.projectId || message.projectId;
+    
+    if (!projectId) {
+      throw new Error('projectId is required');
+    }
+
     logger.info('Starting file watch', {
       connectionId: connection.id,
-      projectId: message.projectId,
+      projectId: projectId,
     });
 
     // Запускаем watcher для проекта
     await fileWatcherService.startWatching({
-      projectId: message.projectId,
+      projectId: projectId,
       connectionId: connection.id,
       ignoreInitial: false
     });
@@ -311,14 +474,15 @@ async function handleFileWatchStart(connection: WebSocketConnection, message: Fi
     // Отправляем подтверждение
     sendMessage(connection.ws, {
       type: 'file_watch_started',
-      projectId: message.projectId,
+      projectId: projectId,
       timestamp: new Date().toISOString()
     });
 
   } catch (error) {
+    const projectId = (message as unknown as {payload?: {projectId?: string}}).payload?.projectId || message.projectId;
     logger.error('Error starting file watch', {
       connectionId: connection.id,
-      projectId: message.projectId,
+      projectId: projectId,
       error: error instanceof Error ? error.message : String(error)
     });
     
@@ -333,25 +497,33 @@ async function handleFileWatchStop(connection: WebSocketConnection, message: Fil
       throw new Error('File watch messages only allowed on files connections');
     }
 
+    // Извлекаем projectId из payload (совместимость с фронтендом)
+    const projectId = (message as unknown as {payload?: {projectId?: string}}).payload?.projectId || message.projectId;
+    
+    if (!projectId) {
+      throw new Error('projectId is required');
+    }
+
     logger.info('Stopping file watch', {
       connectionId: connection.id,
-      projectId: message.projectId,
+      projectId: projectId,
     });
 
     // Останавливаем watcher для проекта
-    fileWatcherService.stopWatching(message.projectId);
+    fileWatcherService.stopWatching(projectId);
 
     // Отправляем подтверждение
     sendMessage(connection.ws, {
       type: 'file_watch_stopped',
-      projectId: message.projectId,
+      projectId: projectId,
       timestamp: new Date().toISOString()
     });
 
   } catch (error) {
+    const projectId = (message as unknown as {payload?: {projectId?: string}}).payload?.projectId || message.projectId;
     logger.error('Error stopping file watch', {
       connectionId: connection.id,
-      projectId: message.projectId,
+      projectId: projectId,
       error: error instanceof Error ? error.message : String(error)
     });
     

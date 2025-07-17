@@ -69,7 +69,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
       console.log('WebSocketProvider: Effect cleanup', new Date().toISOString());
       setIsConnected(false);
     };
-  }, []); // Empty dependency array - run once on mount
+  }, [getClient, handleMessage]);
 
   const contextValue: WebSocketContextType = {
     isConnected,

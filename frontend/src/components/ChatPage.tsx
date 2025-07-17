@@ -7,6 +7,7 @@ import ToolEventRenderer from "./ToolEventRenderer";
 import SplitPanelLayout from "./SplitPanelLayout";
 import { FileExplorer } from "./FileExplorer";
 import { MonacoEditor } from "./MonacoEditor";
+import { TerminalPanel } from "./TerminalPanel";
 import { useFileWatcher } from "../hooks/useFileWatcher";
 
 interface ChatMessage {
@@ -39,6 +40,8 @@ const ChatPage: React.FC = () => {
   const [streaming, setStreaming] = useState<boolean>(false);
   const [lastStreamUpdate, setLastStreamUpdate] = useState<number>(0);
   const lastStreamContentRef = useRef<string>('');
+  const [isAIWorking, setIsAIWorking] = useState<boolean>(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
   
   // Мемоизированные обработчики для лучшей производительности
   const renderMessage = useCallback((m: ChatMessage) => {
@@ -76,6 +79,7 @@ const ChatPage: React.FC = () => {
   const [fileContent, setFileContent] = useState<string>("");
   const [fileLoading, setFileLoading] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [isTerminalVisible, setIsTerminalVisible] = useState(true);
   const { state: fileWatcherState, actions: fileWatcherActions } = useFileWatcher();
 
   // Initialize file watcher when project is available
@@ -173,7 +177,8 @@ const ChatPage: React.FC = () => {
       }]);
       return;
     }
-    if (sending || streaming) return;
+    if (sending || streaming || isAIWorking) return;
+    
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       content: draft,
@@ -186,11 +191,19 @@ const ChatPage: React.FC = () => {
     setSending(true);
     setStreamingAI("");
     setStreaming(true);
+    setIsAIWorking(true);
+    
+    // Создаем AbortController для возможности отмены
+    abortControllerRef.current = new AbortController();
+    
     try {
       const api = new Api();
       const payload = { message: draft, options: { sessionId } };
       // Важно: rawResponse: true чтобы получить Response и работать с потоком
-      const resp = await api.projectsChatStreamCreate(projectId, payload, { rawResponse: true } as unknown as RequestParams & { rawResponse: boolean });
+      const resp = await api.projectsChatStreamCreate(projectId, payload, { 
+        rawResponse: true,
+        signal: abortControllerRef.current.signal
+      } as unknown as RequestParams & { rawResponse: boolean });
       if (!resp.body) throw new Error("No stream");
       const reader = resp.body.getReader();
       let aiMsg = "";
@@ -250,6 +263,7 @@ const ChatPage: React.FC = () => {
                 }]);
                 setStreamingAI("");
                 setStreaming(false);
+                setIsAIWorking(false);
               }
               if (event.type === "error") {
                 setMessages((prev) => [...prev, {
@@ -261,6 +275,7 @@ const ChatPage: React.FC = () => {
                 }]);
                 setStreamingAI("");
                 setStreaming(false);
+                setIsAIWorking(false);
               }
             } catch {
               // ignore
@@ -278,9 +293,24 @@ const ChatPage: React.FC = () => {
       }]);
       setStreamingAI("");
       setStreaming(false);
+      setIsAIWorking(false);
     } finally {
       setSending(false);
+      setIsAIWorking(false);
+      abortControllerRef.current = null;
     }
+  };
+
+  // Функция для остановки работы AI
+  const handleStopAI = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    setStreamingAI("");
+    setStreaming(false);
+    setIsAIWorking(false);
+    setSending(false);
+    abortControllerRef.current = null;
   };
 
   // File system handlers
@@ -382,16 +412,63 @@ const ChatPage: React.FC = () => {
         )}
         <div ref={messagesEndRef} />
       </section>
+      {/* Индикатор работы AI */}
+      {isAIWorking && (
+        <div style={{
+          padding: '12px 16px',
+          backgroundColor: '#1e293b',
+          borderTop: '1px solid #334155',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          color: '#38bdf8'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: '#38bdf8',
+              animation: 'pulse 1.5s infinite'
+            }}></div>
+            <span style={{ fontSize: '14px' }}>AI работает...</span>
+          </div>
+          <button
+            onClick={handleStopAI}
+            style={{
+              background: '#dc2626',
+              border: 'none',
+              color: 'white',
+              padding: '6px 12px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '12px',
+              fontWeight: '500'
+            }}
+            onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#b91c1c'}
+            onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
+          >
+            Остановить
+          </button>
+        </div>
+      )}
+      
       <form className={styles.inputBar} onSubmit={handleSend}>
         <textarea
           className={styles.textarea}
-          placeholder="Type your message..."
+          placeholder={isAIWorking ? "AI работает, дождитесь завершения..." : "Type your message..."}
           rows={2}
           value={draft}
           onChange={e => setDraft(e.target.value)}
-          disabled={sending || streaming}
+          disabled={sending || streaming || isAIWorking}
         />
-        <button type="submit" className={styles.sendBtn} disabled={sending || streaming || !draft.trim()}>Send</button>
+        <button 
+          type="submit" 
+          className={styles.sendBtn} 
+          disabled={sending || streaming || isAIWorking || !draft.trim()}
+        >
+          Send
+        </button>
       </form>
       <button className={styles.backBtn} onClick={() => navigate("/")}>Back to sessions</button>
     </div>
@@ -415,21 +492,52 @@ const ChatPage: React.FC = () => {
       </div>
 
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        {selectedFile ? (
-          <div style={{ flex: 1, minHeight: 0, background: '#18181b', borderRadius: '0 10px 10px 0' }}>
-            <MonacoEditor
-              filePath={selectedFile}
-              content={fileLoading ? "" : fileContent}
-              onContentChange={handleContentChange}
-              onSave={handleSave}
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          {selectedFile ? (
+            <div style={{ flex: 1, minHeight: 0, background: '#18181b', borderRadius: '0 10px 10px 0' }}>
+              <MonacoEditor
+                filePath={selectedFile}
+                content={fileLoading ? "" : fileContent}
+                onContentChange={handleContentChange}
+                onSave={handleSave}
+              />
+              {fileError && <div style={{ color: '#f87171', padding: 18 }}>{fileError}</div>}
+            </div>
+          ) : (
+            <div style={{ flex: 1, minHeight: 0, background: '#1e1e1e', color: '#888', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontFamily: 'Fira Mono, monospace' }}>
+              <span style={{ opacity: 0.7 }}>Выберите файл для просмотра</span>
+            </div>
+          )}
+        </div>
+
+        {/* Terminal Section */}
+        <div style={{ height: '300px', display: 'flex', flexDirection: 'column', borderTop: '1px solid #3e3e3e', background: '#1e1e1e' }}>
+          <div style={{ height: '30px', backgroundColor: '#2d2d2d', display: 'flex', alignItems: 'center', padding: '0 12px', borderBottom: '1px solid #3e3e3e' }}>
+            <button 
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#cccccc',
+                fontSize: '12px',
+                cursor: 'pointer',
+                padding: '4px 8px',
+                borderRadius: '2px',
+                transition: 'background-color 0.1s ease'
+              }}
+              onClick={() => setIsTerminalVisible(!isTerminalVisible)}
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#3e3e3e'}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+              {isTerminalVisible ? '⬇ Hide Terminal' : '⬆ Show Terminal'}
+            </button>
+          </div>
+          {isTerminalVisible && projectId && (
+            <TerminalPanel 
+              projectId={projectId} 
+              isVisible={isTerminalVisible}
             />
-            {fileError && <div style={{ color: '#f87171', padding: 18 }}>{fileError}</div>}
-          </div>
-        ) : (
-          <div style={{ flex: 1, minHeight: 0, background: '#1e1e1e', color: '#888', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontFamily: 'Fira Mono, monospace' }}>
-            <span style={{ opacity: 0.7 }}>Выберите файл для просмотра</span>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

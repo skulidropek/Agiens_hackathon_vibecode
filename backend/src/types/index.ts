@@ -321,6 +321,21 @@ export interface ChatEvent extends AppEvent {
 
 // Utility types
 // Типы для файлового watcher
+export interface FileWatchStartPayload extends BaseWebSocketMessage {
+  type: 'file_watch_start';
+  payload: {
+    projectId: string;
+  };
+}
+
+export interface FileWatchStopPayload extends BaseWebSocketMessage {
+  type: 'file_watch_stop';
+  payload: {
+    projectId: string;
+  };
+}
+
+// Оставляем старые интерфейсы для обратной совместимости
 export interface FileWatchStart extends BaseWebSocketMessage {
   type: 'file_watch_start';
   projectId: string;
@@ -339,6 +354,30 @@ export interface FileWatchMessage extends BaseWebSocketMessage {
   data: Record<string, unknown>;
 }
 
+// Terminal subscription and resize commands
+export interface TerminalSubscription extends BaseWebSocketMessage {
+  type: 'subscribe_terminal';
+  payload: {
+    terminalId: string;
+  };
+}
+
+export interface TerminalUnsubscription extends BaseWebSocketMessage {
+  type: 'unsubscribe_terminal';
+  payload: {
+    terminalId: string;
+  };
+}
+
+export interface TerminalResize extends BaseWebSocketMessage {
+  type: 'terminal_resize';
+  payload: {
+    terminalId: string;
+    cols: number;
+    rows: number;
+  };
+}
+
 export type WebSocketMessageType = 
   | ChatMessage 
   | ChatResponse 
@@ -347,6 +386,9 @@ export type WebSocketMessageType =
   | TerminalInput 
   | TerminalCommand 
   | TerminalStatus 
+  | TerminalSubscription
+  | TerminalUnsubscription
+  | TerminalResize
   | FileChange
   | FileWatchStart
   | FileWatchStop

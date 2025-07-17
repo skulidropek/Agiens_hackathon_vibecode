@@ -56,7 +56,7 @@ const projectChatService = new ProjectChatService(projectService);
 const aiService = new AIService();
 const projectAIService = new ProjectAIService(projectService);
 const fileWatcherService = new FileWatcherService(projectService);
-const terminalService = new TerminalService(config);
+const terminalService = new TerminalService(config, projectService);
 
 // Middleware
 app.use(helmet());

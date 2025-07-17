@@ -2,7 +2,7 @@ import { spawn, IPty } from 'node-pty';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger';
 import { AppConfig } from '../config/app-config';
-import path from 'path';
+import { ProjectService } from './project-service';
 
 export interface TerminalSession {
   id: string;
@@ -53,11 +53,13 @@ export interface TerminalStats {
 export class TerminalService {
   private sessions = new Map<string, TerminalSession>();
   private config: AppConfig;
+  private projectService: ProjectService;
   private readonly maxHistoryLength = 1000;
   private readonly sessionTimeoutMs = 30 * 60 * 1000; // 30 minutes
 
-  constructor(config: AppConfig) {
+  constructor(config: AppConfig, projectService: ProjectService) {
     this.config = config;
+    this.projectService = projectService;
     
     // Cleanup inactive sessions every 5 minutes
     setInterval(() => {
@@ -78,7 +80,7 @@ export class TerminalService {
     const {
       command = 'bash',
       args = [],
-      cwd = request.cwd || this.getProjectWorkingDirectory(request.projectId),
+      cwd = request.cwd || await this.getProjectWorkingDirectory(request.projectId),
       env = {},
       cols = 80,
       rows = 24
@@ -367,14 +369,12 @@ export class TerminalService {
   /**
    * Get project working directory
    */
-  private getProjectWorkingDirectory(_projectId: string): string {
-    // This should ideally use ProjectService to get the actual project path
-    const projectPath = path.join(this.config.workspaceDir, _projectId);
-    // Basic security check to prevent path traversal
-    if (!path.resolve(projectPath).startsWith(path.resolve(this.config.workspaceDir))) {
-        throw new Error(`Invalid projectId leading to path traversal: ${_projectId}`);
+  private async getProjectWorkingDirectory(projectId: string): Promise<string> {
+    const project = await this.projectService.getProject(projectId);
+    if (!project) {
+      throw new Error(`Project not found: ${projectId}`);
     }
-    return projectPath;
+    return project.path;
   }
 
   /**

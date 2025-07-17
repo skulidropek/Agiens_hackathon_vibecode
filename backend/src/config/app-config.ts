@@ -26,7 +26,7 @@ export class AppConfig {
       : path.join(process.cwd(), 'workspace');
     
     this.projectsDir = path.join(this.workspaceDir, 'projects');
-
+    
     this.geminiApiKey = process.env.GEMINI_API_KEY || '';
     this.jwtSecret = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
     this.nodeEnv = process.env.NODE_ENV || 'development';

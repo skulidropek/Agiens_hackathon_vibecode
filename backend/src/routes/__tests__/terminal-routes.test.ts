@@ -3,6 +3,7 @@ import request from 'supertest';
 import express from 'express';
 import { setupTerminalRoutes } from '../../routes/terminal-routes';
 import { TerminalService, TerminalSession } from '../../services/terminal-service';
+import { ProjectService } from '../../services/project-service';
 import { loadConfig } from '../../config/app-config';
 import { errorHandler } from '../../middleware/error-handler';
 
@@ -15,7 +16,8 @@ describe('Terminal Routes', () => {
 
   beforeEach(() => {
     const config = loadConfig();
-    terminalService = new TerminalService(config) as jest.Mocked<TerminalService>;
+    const projectService = new ProjectService(config.workspaceDir);
+    terminalService = new TerminalService(config, projectService) as jest.Mocked<TerminalService>;
 
     app = express();
     app.use(express.json());

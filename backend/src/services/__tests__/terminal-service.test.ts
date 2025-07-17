@@ -1,6 +1,7 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import { TerminalService, CreateTerminalRequest, TerminalSession } from '../terminal-service';
 import { AppConfig, loadConfig } from '../../config/app-config';
+import { ProjectService } from '../project-service';
 
 jest.mock('node-pty', () => ({
   spawn: jest.fn().mockImplementation(() => ({
@@ -16,11 +17,24 @@ jest.mock('node-pty', () => ({
 describe('TerminalService', () => {
   let terminalService: TerminalService;
   let config: AppConfig;
+  let projectService: ProjectService;
   const mockPty = require('node-pty');
 
   beforeEach(() => {
     config = loadConfig();
-    terminalService = new TerminalService(config);
+    projectService = new ProjectService(config.workspaceDir);
+    
+    // Mock getProject to return a fake project
+    jest.spyOn(projectService, 'getProject').mockResolvedValue({
+      id: 'test-project',
+      name: 'test-project',
+      path: '/tmp/test-project',
+      type: 'local',
+      createdAt: new Date(),
+      lastAccessed: new Date(),
+    });
+    
+    terminalService = new TerminalService(config, projectService);
     jest.clearAllMocks();
   });
 
@@ -53,7 +67,7 @@ describe('TerminalService', () => {
     it('should use the project-specific working directory', async () => {
         const request: CreateTerminalRequest = { projectId: 'test-project' };
         await terminalService.createSession(request);
-        const expectedCwd = `${config.workspaceDir}/test-project`;
+        const expectedCwd = '/tmp/test-project'; // From our mocked project
         expect(mockPty.spawn).toHaveBeenCalledWith(
             'bash', [], expect.objectContaining({ cwd: expectedCwd })
         );

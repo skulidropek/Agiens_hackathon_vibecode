@@ -1,6 +1,7 @@
 import { WebSocketConnection, ChatMessage, ChatResponse, ChatError, GeminiRequest, GeminiResponse } from '../types';
 import { logger } from '../utils/logger';
 import { AppConfig } from '../config/app-config';
+import { ProjectChatService } from '../services/project-chat-service';
 import { v4 as uuidv4 } from 'uuid';
 
 const config = new AppConfig();
@@ -8,8 +9,10 @@ const config = new AppConfig();
 export class ChatHandler {
   private geminiProcess: NodeJS.Process | null = null;
   private isProcessing = false;
+  private projectChatService: ProjectChatService;
 
-  constructor() {
+  constructor(projectChatService: ProjectChatService) {
+    this.projectChatService = projectChatService;
     this.initializeGeminiProcess();
   }
 
@@ -80,6 +83,27 @@ export class ChatHandler {
   }
 
   private async processWithGemini(message: ChatMessage): Promise<GeminiResponse> {
+    // Загружаем историю чата, если есть conversationId
+    let chatHistory: ChatMessage[] = [];
+    if (message.conversationId) {
+      try {
+        // Получаем projectId из сообщения или из контекста
+        const projectId = message.projectId;
+        if (projectId) {
+          chatHistory = await this.projectChatService.loadHistory(projectId, message.conversationId);
+          logger.info('Loaded chat history', {
+            conversationId: message.conversationId,
+            historyLength: chatHistory.length
+          });
+        }
+      } catch (error) {
+        logger.warn('Failed to load chat history', {
+          conversationId: message.conversationId,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    }
+
     // Создаем запрос к Gemini
     const request: GeminiRequest = {
       prompt: message.content,
@@ -87,7 +111,7 @@ export class ChatHandler {
         workspaceFiles: [], // Здесь будут файлы из workspace
         currentDirectory: config.workspaceDir,
         terminalHistory: [], // Здесь будет история терминала
-        chatHistory: [] // Здесь будет история чата
+        chatHistory: chatHistory // Передаем загруженную историю чата
       },
       tools: ['shell', 'files'], // Инструменты для AI
       temperature: 0.7,
@@ -103,10 +127,26 @@ export class ChatHandler {
     // Имитируем задержку обработки
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // Простая логика для демонстрации
+    // Простая логика для демонстрации с учетом истории чата
     let response = '';
     
-    if (request.prompt.toLowerCase().includes('создай') || request.prompt.toLowerCase().includes('создать')) {
+    // Проверяем историю чата
+    const hasHistory = request.context?.chatHistory && request.context.chatHistory.length > 0;
+    
+    if (request.prompt.toLowerCase().includes('помнишь') || request.prompt.toLowerCase().includes('помнит')) {
+      if (hasHistory) {
+        const recentMessages = request.context!.chatHistory.slice(-5); // Последние 5 сообщений
+        response = 'Да, я помню нашу беседу! Мы обсуждали:\n';
+        recentMessages.forEach((msg, index) => {
+          if (msg.sender === 'user') {
+            response += `${index + 1}. Вы: '${msg.content}'\n`;
+          }
+        });
+        response += '\nЧто вы хотели бы обсудить дальше?';
+      } else {
+        response = 'К сожалению, я не вижу истории нашей предыдущей беседы. Возможно, это новая сессия. Расскажите, что вас интересует?';
+      }
+    } else if (request.prompt.toLowerCase().includes('создай') || request.prompt.toLowerCase().includes('создать')) {
       response = `Я создам для вас ${request.prompt}. Сейчас выполню необходимые команды в терминале.`;
     } else if (request.prompt.toLowerCase().includes('помощь') || request.prompt.toLowerCase().includes('help')) {
       response = `Я могу помочь вам с:

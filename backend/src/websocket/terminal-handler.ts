@@ -30,11 +30,11 @@ export class TerminalHandler {
   public async handleInput(connection: WebSocketConnection, message: TerminalInput): Promise<void> {
     try {
       const { sessionId, data } = message;
-      
+    
       if (!sessionId) {
         this.sendErrorMessage(connection, 'Session ID is required', 'MISSING_SESSION_ID');
-        return;
-      }
+      return;
+    }
 
       const success = this.terminalService.writeToSession(sessionId, data);
       if (!success) {
@@ -67,11 +67,11 @@ export class TerminalHandler {
   public async handleCommand(connection: WebSocketConnection, message: TerminalCommand): Promise<void> {
     try {
       const { sessionId, command } = message;
-      
+    
       if (!sessionId) {
         this.sendErrorMessage(connection, 'Session ID is required', 'MISSING_SESSION_ID');
-        return;
-      }
+      return;
+    }
 
       logger.info('Executing terminal command', {
         sessionId,
@@ -106,7 +106,7 @@ export class TerminalHandler {
       if (!sessionId) {
         this.sendErrorMessage(connection, 'Session ID is required', 'MISSING_SESSION_ID');
         return;
-      }
+    }
 
       const success = this.terminalService.resizeSession(sessionId, cols, rows);
       if (!success) {

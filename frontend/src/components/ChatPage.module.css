@@ -162,4 +162,17 @@
 ::-webkit-scrollbar-thumb {
   background: #222;
   border-radius: 8px;
+}
+
+/* Анимация пульсации для индикатора работы AI */
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 1;
+  }
 } 

@@ -18,6 +18,7 @@ export class WebSocketClient {
   private readonly maxReconnectAttempts = 10;
   private readonly reconnectInterval = 3000;
   private commandQueue: WebSocketCommand[] = [];
+  private listeners: MessageHandler[] = [];
 
   // Приватный конструктор, чтобы предотвратить создание через `new`
   private constructor() {}
@@ -74,7 +75,17 @@ export class WebSocketClient {
           console.log('Connection established with ID:', message.connectionId);
         }
 
+        // Call the main message handler
         this.messageHandler?.(message);
+        
+        // Also notify all terminal listeners
+        this.listeners.forEach(listener => {
+          try {
+            listener(message);
+          } catch (error) {
+            console.error('Error in terminal listener:', error);
+          }
+        });
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
       }
@@ -139,15 +150,11 @@ export class WebSocketClient {
   }
 
   public startWatching(projectId: string): void {
-    console.log('📤 WebSocketClient: Sending file_watch_start command for project:', projectId, new Date().toISOString());
-    this.sendCommand({
-      type: 'file_watch_start',
-      projectId,
-    });
+    this.sendCommand({ type: 'file_watch_start', payload: { projectId } });
   }
 
   public stopWatching(projectId: string): void {
-    this.sendCommand({ type: 'file_watch_stop', projectId });
+    this.sendCommand({ type: 'file_watch_stop', payload: { projectId } });
   }
 
   public getFileContent(filePath: string): Promise<string> {
@@ -158,32 +165,20 @@ export class WebSocketClient {
   }
 
   public saveFileContent(filePath: string, content: string): void {
-    this.sendCommand({
-      type: 'file_save_content',
-      filePath,
-      content,
-    });
+    this.sendCommand({ type: 'file_save_content', payload: { filePath, content } });
   }
   
   public createFile(filePath: string, content?: string): void {
-    this.sendCommand({
-      type: 'file_create',
-      filePath,
-      content: content ?? '',
-    });
+    this.sendCommand({ type: 'file_create', payload: { filePath, content } });
   }
 
   public deleteFile(filePath: string): void {
-    this.sendCommand({ type: 'file_delete', filePath });
+    this.sendCommand({ type: 'file_delete', payload: { filePath } });
   }
 
   public renameFile(oldPath: string, newPath: string): void {
     console.log('📁 WebSocketClient: Sending rename file command', { from: oldPath, to: newPath, timestamp: new Date().toISOString() });
-    this.sendCommand({
-      type: 'file_rename',
-      oldPath,
-      newPath
-    });
+    this.sendCommand({ type: 'file_rename', payload: { oldPath, newPath } });
   }
 
   public isConnected(): boolean {
@@ -209,5 +204,41 @@ export class WebSocketClient {
       this.ws.close();
       this.ws = null;
     }
+  }
+
+  public sendMessage(command: WebSocketCommand) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(command));
+    } else {
+      this.commandQueue.push(command);
+    }
+  }
+
+  public subscribeToTerminal(terminalId: string, onData: (data: string) => void): () => void {
+    const handler = (message: WebSocketMessage) => {
+      if (message.type === 'terminal_output' && message.terminalId === terminalId) {
+        onData(message.data);
+      }
+    };
+    this.listeners.push(handler);
+    
+    // Отправляем команду подписки на терминал через основной WebSocket
+    this.sendMessage({ type: 'subscribe_terminal', payload: { terminalId } });
+
+    return () => {
+      // Отписываемся от терминала
+      this.sendMessage({ type: 'unsubscribe_terminal', payload: { terminalId } });
+      this.listeners = this.listeners.filter(l => l !== handler);
+    };
+  }
+
+  public sendTerminalInput(terminalId: string, data: string) {
+    // Отправляем ввод терминала через основной WebSocket
+    this.sendMessage({ type: 'terminal_input', payload: { terminalId, data } });
+  }
+
+  public resizeTerminal(terminalId: string, size: { cols: number; rows: number }) {
+    // Отправляем команду изменения размера через основной WebSocket
+    this.sendMessage({ type: 'terminal_resize', payload: { terminalId, ...size } });
   }
 } 

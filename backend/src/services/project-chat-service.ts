@@ -10,12 +10,19 @@ export class ProjectChatService {
   /**
    * Получить AI контекст для активного проекта
    */
-  async getAIContext(projectId: string): Promise<AIContext> {
+  async getAIContext(projectId: string, conversationId?: string): Promise<AIContext> {
     const project = await this.projectService.getProject(projectId);
     if (!project) { throw new Error('Project not found'); }
     
     try {
       const projectFiles = await this.getProjectFiles(project.path);
+      
+      // Загружаем историю чата, если указан conversationId
+      let chatHistory: ChatMessage[] = [];
+      if (conversationId) {
+        chatHistory = await this.loadHistory(projectId, conversationId);
+        logger.info(`Loaded chat history for conversation ${conversationId}: ${chatHistory.length} messages`);
+      }
       
       return {
         projectId: project.id,
@@ -24,7 +31,7 @@ export class ProjectChatService {
         workspaceFiles: projectFiles,
         currentDirectory: project.path,
         terminalHistory: [],
-        chatHistory: []
+        chatHistory
       };
     } catch (error) {
       logger.error('Error building AI context:', error instanceof Error ? error.message : String(error));

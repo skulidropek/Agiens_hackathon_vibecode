@@ -245,7 +245,7 @@ export function setupProjectAIRoutes(projectAIService: ProjectAIService) {
       let aiContentBuffer = '';
       let lastTimestamp = new Date().toISOString();
       try {
-        for await (const event of projectAIService.processMessageStream(message, { projectId, ...options, sessionId })) {
+        for await (const event of projectAIService.processMessageStream(message, { projectId, ...options, sessionId, conversationId: sessionId })) {
           if (event.type === 'content' && event.content) {
             aiContentBuffer += event.content;
             lastTimestamp = event.timestamp;

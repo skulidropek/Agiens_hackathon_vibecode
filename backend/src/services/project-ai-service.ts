@@ -1,5 +1,7 @@
 import { AIService, AIServiceOptions, AIResponse, AIStreamEvent } from './ai-service';
 import { ProjectService } from './project-service';
+import { ProjectChatService } from './project-chat-service';
+import { AIContext } from '../types';
 import { logger } from '../utils/logger';
 import { PathManager } from '../utils/path-manager';
 import { RetryUtils } from '../utils/retry-utils';
@@ -7,6 +9,7 @@ import { RetryUtils } from '../utils/retry-utils';
 export interface ProjectAIOptions {
   projectId: string;
   sessionId?: string;
+  conversationId?: string;
   fullContext?: boolean;
   model?: string;
   debugMode?: boolean;
@@ -15,10 +18,12 @@ export interface ProjectAIOptions {
 export class ProjectAIService {
   private aiService: AIService;
   public projectService: ProjectService;
+  private projectChatService: ProjectChatService;
 
   constructor(projectService: ProjectService) {
     this.aiService = new AIService();
     this.projectService = projectService;
+    this.projectChatService = new ProjectChatService(projectService);
   }
 
   async initialize(options: ProjectAIOptions): Promise<void> {
@@ -61,12 +66,20 @@ export class ProjectAIService {
 
       const projectPath = PathManager.getProjectPath(project.name);
       
+      // Загружаем контекст чата, если указан conversationId
+      let aiContext: AIContext | undefined = undefined;
+      if (options.conversationId) {
+        aiContext = await this.projectChatService.getAIContext(options.projectId, options.conversationId);
+        logger.info(`Loaded AI context for conversation ${options.conversationId}: ${aiContext.chatHistory.length} messages`);
+      }
+      
       const aiOptions = {
         projectPath,
         fullContext: options.fullContext || false,
         model: options.model,
         debugMode: options.debugMode || false,
         sessionId: options.sessionId || `project-${options.projectId}-${Date.now()}`,
+        aiContext, // Передаем контекст в AI сервис
       };
 
       return await RetryUtils.executeWithRetry(
@@ -98,12 +111,20 @@ export class ProjectAIService {
 
       const projectPath = PathManager.getProjectPath(project.name);
       
+      // Загружаем контекст чата, если указан conversationId
+      let aiContext: AIContext | undefined = undefined;
+      if (options.conversationId) {
+        aiContext = await this.projectChatService.getAIContext(options.projectId, options.conversationId);
+        logger.info(`Loaded AI context for conversation ${options.conversationId}: ${aiContext.chatHistory.length} messages`);
+      }
+      
       const aiOptions = {
         projectPath,
         fullContext: options.fullContext || false,
         model: options.model,
         debugMode: options.debugMode || false,
         sessionId: options.sessionId || `project-${options.projectId}-${Date.now()}`,
+        aiContext, // Передаем контекст в AI сервис
       };
 
       yield* this.aiService.processMessageStream(message, aiOptions);
