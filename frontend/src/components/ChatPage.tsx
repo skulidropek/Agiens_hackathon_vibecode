@@ -220,7 +220,7 @@ const ChatPage: React.FC = () => {
             if (!dataStr) return;
             try {
               const event = JSON.parse(dataStr);
-              console.log('Received streaming event:', event.type, new Date().toISOString());
+              console.log('Received streaming event:', event.type, new Date().toISOString(), event);
               if (event.type === "connection_opened") {
                 console.log('SSE connection opened for streaming');
                 return; // Игнорируем это служебное событие
@@ -243,7 +243,7 @@ const ChatPage: React.FC = () => {
                   }, 50);
                 }
               }
-              if (event.type === "tool_start" || event.type === "tools_start" || event.type === "tools_complete") {
+              if (event.type === "tool_start" || event.type === "tools_start" || event.type === "tools_complete" || event.type === "tool_success" || event.type === "tool_error") {
                 console.log('Adding tool event:', event.type, event.timestamp);
                 setMessages((prev) => [...prev, {
                   id: `tool-${Date.now()}-${Math.random()}`,
@@ -254,9 +254,12 @@ const ChatPage: React.FC = () => {
                 }]);
               }
               if (event.type === "complete") {
+                console.log('AI response complete. Final response:', event.final_response);
+                console.log('Accumulated AI message:', aiMsg);
+                const finalContent = event.final_response || aiMsg;
                 setMessages((prev) => [...prev, {
                   id: `ai-${Date.now()}`,
-                  content: event.final_response || aiMsg,
+                  content: finalContent,
                   sender: "ai",
                   timestamp: event.timestamp || new Date().toISOString(),
                   type: "chat_message",

@@ -214,10 +214,43 @@ export class AIService {
         if (thoughtPart?.thought) {
           return null;
         }
-        return candidate.content.parts
+        
+        // Собираем весь текст из всех частей
+        const textParts = candidate.content.parts
           .filter((part) => part.text)
-          .map((part) => part.text)
-          .join('');
+          .map((part) => part.text);
+        
+        const fullText = textParts.join('');
+        
+        // Проверяем, не является ли ответ JSON
+        try {
+          const parsed = JSON.parse(fullText);
+          // Если это JSON, извлекаем только текстовое содержимое
+          if (parsed && typeof parsed === 'object') {
+            // Ищем текстовое содержимое в JSON структуре
+            if (parsed.content) {
+              return parsed.content;
+            } else if (parsed.text) {
+              return parsed.text;
+            } else if (parsed.message) {
+              return parsed.message;
+            } else if (Array.isArray(parsed)) {
+              // Если это массив, ищем первый элемент с текстом
+              for (const item of parsed) {
+                if (item.content) return item.content;
+                if (item.text) return item.text;
+                if (item.message) return item.message;
+              }
+            }
+            // Если не нашли текстовое содержимое, возвращаем как есть
+            return fullText;
+          }
+        } catch (e) {
+          // Если это не JSON, возвращаем как есть
+          return fullText;
+        }
+        
+        return fullText;
       }
     }
     return null;
@@ -248,12 +281,13 @@ export class AIService {
       // Создаем сообщения с учетом истории чата
       const currentMessages: Content[] = [];
       
-      // Добавляем историю чата, если есть
+      // Добавляем историю чата, если есть (ограничиваем последними 10 сообщениями для контекста)
       if (options.aiContext?.chatHistory && options.aiContext.chatHistory.length > 0) {
-        logger.info(`Adding ${options.aiContext.chatHistory.length} messages from chat history to context`);
+        const recentHistory = options.aiContext.chatHistory.slice(-10); // Берем последние 10 сообщений
+        logger.info(`Adding ${recentHistory.length} recent messages from chat history to context (out of ${options.aiContext.chatHistory.length} total)`);
         
         // Конвертируем историю чата в формат Content
-        for (const msg of options.aiContext.chatHistory) {
+        for (const msg of recentHistory) {
           currentMessages.push({
             role: msg.sender === 'user' ? 'user' : 'model',
             parts: [{ text: msg.content }]
@@ -263,6 +297,15 @@ export class AIService {
       
       // Добавляем текущее сообщение пользователя
       currentMessages.push({ role: 'user', parts: [{ text: input }] });
+      
+      // Логируем контекст, который отправляется в AI
+      logger.info('🤖 AI Context Summary:');
+      logger.info(`   - Total messages in context: ${currentMessages.length}`);
+      logger.info(`   - Current user input: "${input.substring(0, 100)}${input.length > 100 ? '...' : ''}"`);
+      logger.info(`   - Recent history messages: ${currentMessages.slice(0, -1).map(m => {
+        const text = m.parts?.[0]?.text || 'No text';
+        return `${m.role}: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`;
+      }).join(', ')}`);
       
       const turnCount = 0;
       const responseText = '';
@@ -325,9 +368,20 @@ export class AIService {
       turnCount++;
       const functionCalls: FunctionCall[] = [];
 
+      // Отправляем всю историю сообщений в чат через sendMessage
+      for (let i = 0; i < currentMessages.length - 1; i++) {
+        await chat.sendMessage({
+          message: currentMessages[i].parts || [],
+          config: {
+            abortSignal: abortController.signal,
+          },
+        }, prompt_id);
+      }
+      
+      // Отправляем текущее сообщение через sendMessageStream
       const responseStream = await chat.sendMessageStream(
         {
-          message: currentMessages[0]?.parts || [],
+          message: currentMessages[currentMessages.length - 1]?.parts || [],
           config: {
             abortSignal: abortController.signal,
             tools: [
@@ -349,6 +403,14 @@ export class AIService {
         if (resp.functionCalls) {
           functionCalls.push(...resp.functionCalls);
         }
+      }
+      
+      // Логируем ответ AI
+      logger.info('🤖 AI Response:');
+      logger.info(`   - Response text: "${responseText.substring(0, 200)}${responseText.length > 200 ? '...' : ''}"`);
+      logger.info(`   - Function calls: ${functionCalls.length}`);
+      if (functionCalls.length > 0) {
+        logger.info(`   - Functions to execute: ${functionCalls.map(fc => fc.name).join(', ')}`);
       }
 
       if (functionCalls.length > 0) {
@@ -458,9 +520,20 @@ export class AIService {
       const functionCalls: FunctionCall[] = [];
       let responseText = '';
 
+      // Отправляем всю историю сообщений в чат через sendMessage
+      for (let i = 0; i < currentMessages.length - 1; i++) {
+        await chat.sendMessage({
+          message: currentMessages[i].parts || [],
+          config: {
+            abortSignal: abortController.signal,
+          },
+        }, prompt_id);
+      }
+      
+      // Отправляем текущее сообщение через sendMessageStream
       const responseStream = await chat.sendMessageStream(
         {
-          message: currentMessages[0]?.parts || [],
+          message: currentMessages[currentMessages.length - 1]?.parts || [],
           config: {
             abortSignal: abortController.signal,
             tools: [
@@ -484,16 +557,33 @@ export class AIService {
         const textPart = this.getResponseText(resp);
         if (textPart) {
           responseText += textPart;
+          logger.debug(`📝 AI text part: "${textPart.substring(0, 100)}${textPart.length > 100 ? '...' : ''}"`);
           yield {
             type: 'content',
             timestamp: new Date().toISOString(),
             content: textPart
           };
+        } else {
+          logger.debug('📝 AI response part has no text content');
         }
 
         if (resp.functionCalls) {
           functionCalls.push(...resp.functionCalls);
         }
+      }
+      
+      // Логируем ответ AI в стриме
+      logger.info('🤖 AI Stream Response:');
+      logger.info(`   - Response text: "${responseText.substring(0, 200)}${responseText.length > 200 ? '...' : ''}"`);
+      logger.info(`   - Response length: ${responseText.length} characters`);
+      logger.info(`   - Function calls: ${functionCalls.length}`);
+      if (functionCalls.length > 0) {
+        logger.info(`   - Functions to execute: ${functionCalls.map(fc => fc.name).join(', ')}`);
+      }
+      
+      // Если ответ пустой, логируем это
+      if (!responseText.trim()) {
+        logger.warn('⚠️ AI returned empty response text');
       }
 
       if (functionCalls.length > 0) {
