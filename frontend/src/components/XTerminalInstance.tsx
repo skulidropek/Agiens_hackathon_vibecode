@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { useTerminalWebSocket } from '../hooks/useTerminalWebSocket';
 
 interface XTerminalInstanceProps {
   terminalId: string;
@@ -10,7 +10,7 @@ interface XTerminalInstanceProps {
 
 export const XTerminalInstance: React.FC<XTerminalInstanceProps> = ({ terminalId }) => {
   const terminalRef = useRef<HTMLDivElement>(null);
-  const { client } = useWebSocket();
+  const { client } = useTerminalWebSocket();
 
   useEffect(() => {
     if (!terminalRef.current || !client) {
@@ -31,9 +31,20 @@ export const XTerminalInstance: React.FC<XTerminalInstanceProps> = ({ terminalId
     });
     resizeObserver.observe(terminalRef.current);
     
-    const unsubscribe = client.subscribeToTerminal(terminalId, (data: string) => {
-      terminal.write(data);
-    });
+    const unsubscribe = client.subscribeToTerminal(
+      terminalId, 
+      (data: string) => {
+        terminal.write(data);
+      },
+      (history) => {
+        // Отображаем историю терминала
+        history.forEach(entry => {
+          if (entry.type === 'output') {
+            terminal.write(entry.data);
+          }
+        });
+      }
+    );
 
     const onDataDisposable = terminal.onData(data => {
       client.sendTerminalInput(terminalId, data);

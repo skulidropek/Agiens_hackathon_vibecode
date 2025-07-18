@@ -1,6 +1,6 @@
-import { WebSocketConnection, TerminalInput, TerminalCommand, TerminalOutput, TerminalStatus } from '../types';
+import { WebSocketConnection, TerminalInput, TerminalCommand, TerminalOutput, TerminalStatus, TerminalHistory } from '../types';
 import { logger } from '../utils/logger';
-import { TerminalService } from '../services/terminal-service';
+import { TerminalService, TerminalHistoryEntry } from '../services/terminal-service';
 import { v4 as uuidv4 } from 'uuid';
 
 export class TerminalHandler {
@@ -141,6 +141,11 @@ export class TerminalHandler {
     // Send current session status
     const session = this.terminalService.getSession(sessionId);
     if (session) {
+      // Send terminal history first
+      const history = this.terminalService.getSessionHistory(sessionId);
+      this.sendHistoryMessage(connection, sessionId, history);
+      
+      // Then send current session status
       this.sendStatusMessage(connection, session.isActive ? 'active' : 'stopped', sessionId, session.pid);
     } else {
       this.sendErrorMessage(connection, 'Terminal session not found', 'SESSION_NOT_FOUND');
@@ -316,5 +321,27 @@ export class TerminalHandler {
     if (connection.ws.readyState === 1) { // WebSocket.OPEN
       connection.ws.send(JSON.stringify(errorMessage));
     }
+  }
+
+  /**
+   * Send terminal history message to WebSocket connection
+   */
+  private sendHistoryMessage(connection: WebSocketConnection, sessionId: string, history: TerminalHistoryEntry[]): void {
+    const historyMessage: TerminalHistory = {
+      type: 'terminal_history',
+      sessionId,
+      history,
+      timestamp: new Date().toISOString(),
+      id: uuidv4()
+    };
+
+    if (connection.ws.readyState === 1) { // WebSocket.OPEN
+      connection.ws.send(JSON.stringify(historyMessage));
+    }
+
+    logger.debug('Terminal history sent', {
+      sessionId,
+      historyLength: history.length
+    });
   }
 } 

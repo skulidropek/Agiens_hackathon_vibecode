@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { XTerminalInstance } from './XTerminalInstance';
 import styles from './TerminalPanel.module.css';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { useTerminalWebSocket } from '../hooks/useTerminalWebSocket';
 
 // A minimal type definition to help with development
 interface TerminalSession {
@@ -20,7 +20,7 @@ export const TerminalPanel: React.FC<{ projectId: string, isVisible: boolean }> 
   const [activeTerminalId, setActiveTerminalId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { client, subscribe } = useWebSocket();
+  const { client, subscribe } = useTerminalWebSocket();
 
   const fetchTerminals = useCallback(async () => {
     if (!projectId) return;

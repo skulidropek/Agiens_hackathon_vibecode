@@ -39,7 +39,7 @@ export class WebSocketClient {
     this.messageHandler = handler;
   }
 
-  public connect(): void {
+  public connect(connectionType: 'files' | 'terminal' | 'chat' = 'files'): void {
     // Если уже есть соединение в состояниях CONNECTING или OPEN – не создаём новое
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       console.log('🔄 WebSocket already connected/connecting, skipping', {
@@ -51,7 +51,7 @@ export class WebSocketClient {
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = '127.0.0.1:3000'; // Явно используем IPv4 для избежания проблем с dual-stack
-    const wsUrl = `${protocol}//${host}/ws?type=files`;
+    const wsUrl = `${protocol}//${host}/ws?type=${connectionType}`;
 
     console.log('🔌 Connecting to WebSocket:', wsUrl, new Date().toISOString());
     this.ws = new WebSocket(wsUrl);
@@ -214,10 +214,12 @@ export class WebSocketClient {
     }
   }
 
-  public subscribeToTerminal(terminalId: string, onData: (data: string) => void): () => void {
+  public subscribeToTerminal(terminalId: string, onData: (data: string) => void, onHistory?: (history: Array<{type: string, data: string, timestamp: string}>) => void): () => void {
     const handler = (message: WebSocketMessage) => {
       if (message.type === 'terminal_output' && message.terminalId === terminalId) {
         onData(message.data);
+      } else if (message.type === 'terminal_history' && message.sessionId === terminalId) {
+        onHistory?.(message.history);
       }
     };
     this.listeners.push(handler);

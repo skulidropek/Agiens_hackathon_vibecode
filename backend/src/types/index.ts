@@ -1,3 +1,5 @@
+import { TerminalHistoryEntry } from '../services/terminal-service';
+
 // Базовые типы WebSocket сообщений
 export interface BaseWebSocketMessage {
   type: string;
@@ -54,6 +56,12 @@ export interface TerminalStatus extends BaseWebSocketMessage {
   status: 'started' | 'active' | 'stopped' | 'error';
   sessionId?: string;
   pid?: number;
+}
+
+export interface TerminalHistory extends BaseWebSocketMessage {
+  type: 'terminal_history';
+  sessionId: string;
+  history: TerminalHistoryEntry[];
 }
 
 // Типы для файлов
@@ -416,6 +424,7 @@ export type WebSocketMessageType =
   | TerminalInput 
   | TerminalCommand 
   | TerminalStatus 
+  | TerminalHistory
   | TerminalSubscription
   | TerminalUnsubscription
   | TerminalListSubscription

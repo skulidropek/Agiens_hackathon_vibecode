@@ -72,6 +72,16 @@ export interface TerminalOutputMessage {
   data: string;
 }
 
+export interface TerminalHistoryMessage {
+  type: 'terminal_history';
+  sessionId: string;
+  history: Array<{
+    type: 'input' | 'output' | 'command' | 'exit';
+    data: string;
+    timestamp: string;
+  }>;
+}
+
 export interface TerminalEventMessage {
   type: 'terminal_event';
   terminalId: string;
@@ -100,5 +110,6 @@ export type WebSocketMessage =
   | ErrorMessage
   | FileEventMessage
   | TerminalOutputMessage
+  | TerminalHistoryMessage
   | TerminalEventMessage
   | TerminalListUpdateMessage; 

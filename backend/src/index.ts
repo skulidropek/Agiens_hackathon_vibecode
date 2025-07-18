@@ -113,7 +113,7 @@ const wss = new WebSocketServer({
   path: '/ws' 
 });
 
-setupWebSocketRoutes(wss, projectService, fileWatcherService);
+setupWebSocketRoutes(wss, projectService, fileWatcherService, terminalService);
 
 // Запуск сервера
 server.listen(config.port, config.host, () => {

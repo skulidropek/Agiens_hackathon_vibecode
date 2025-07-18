@@ -161,6 +161,23 @@ export class TerminalService {
   }
 
   /**
+   * Get terminal session history
+   */
+  public getSessionHistory(sessionId: string): TerminalHistoryEntry[] {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      logger.warn('TerminalService: getSessionHistory called for non-existent session', { sessionId });
+      return [];
+    }
+    
+    logger.info('TerminalService: getSessionHistory called', {
+      sessionId,
+      historyLength: session.history.length
+    });
+    return session.history;
+  }
+
+  /**
    * Get all terminal sessions
    */
   public getAllSessions(): TerminalSession[] {
