@@ -7,6 +7,11 @@ import { RetryUtils } from '../utils/retry-utils';
 import { GeminiChat } from '@google/gemini-cli-core/dist/src/core/geminiChat';
 import { ToolRegistry } from '@google/gemini-cli-core/dist/src/tools/tool-registry';
 import { AIContext } from '../types';
+import { AITerminalIntegration } from './ai-terminal-integration';
+import { TerminalService } from './terminal-service';
+import { ProjectService } from './project-service';
+import { AppConfig } from '../config/app-config';
+import { CustomConfig } from './custom-config';
 
 export interface AIServiceOptions {
   sessionId: string;
@@ -65,6 +70,12 @@ export class AIService {
   private configCache = new Map<string, ConfigCacheEntry>();
   private readonly CACHE_TTL = 30 * 60 * 1000; // 30 минут
   private readonly MAX_CACHE_SIZE = 10;
+  private aiTerminalIntegration: AITerminalIntegration | null = null;
+  private terminalService: TerminalService | null = null;
+
+  constructor(terminalService?: TerminalService) {
+    this.terminalService = terminalService || null;
+  }
 
   /**
    * Инициализация AI сервиса
@@ -79,6 +90,18 @@ export class AIService {
         lastUsed: Date.now(),
         sessionId: options.sessionId
       });
+      
+      // Инициализируем интеграцию с терминалом
+      if (!this.aiTerminalIntegration) {
+        logger.info('🔧 Инициализируем AITerminalIntegration...');
+        const appConfig = new AppConfig();
+        const projectService = new ProjectService(appConfig.workspaceDir);
+        const terminalService = new TerminalService(appConfig, projectService);
+        this.aiTerminalIntegration = new AITerminalIntegration(terminalService);
+        logger.info('✅ AITerminalIntegration инициализирован');
+      }
+
+
       
       logger.info(`AI Service initialized for session: ${options.sessionId}`);
     } catch (error) {
@@ -95,9 +118,12 @@ export class AIService {
     const cached = this.configCache.get(cacheKey);
     
     if (cached && Date.now() - cached.lastUsed < this.CACHE_TTL) {
+      logger.info('AIService: Using cached config', { sessionId, projectPath });
       cached.lastUsed = Date.now();
       return cached.config;
     }
+
+    logger.info('AIService: Creating new config', { sessionId, projectPath });
 
     // Очищаем старые записи кэша
     this.cleanupCache();
@@ -113,6 +139,12 @@ export class AIService {
       config,
       lastUsed: Date.now(),
       sessionId
+    });
+
+    logger.info('AIService: Config created', { 
+      sessionId, 
+      projectPath, 
+      configType: config.constructor.name
     });
 
     return config;
@@ -157,7 +189,35 @@ export class AIService {
   private async createCoreConfig(options: AIServiceOptions): Promise<Config> {
     const workingDir = PathManager.normalizeProjectPath(options.projectPath || options.cwd || process.cwd());
     
-    const config = new Config({
+    // Создаем сервисы для кастомной конфигурации
+    const appConfig = new AppConfig();
+    const projectService = new ProjectService(appConfig.workspaceDir);
+    
+    // Используем переданный TerminalService или создаем новый
+    const terminalService = this.terminalService || new TerminalService(appConfig, projectService);
+    
+    // Дожидаемся загрузки проектов перед получением списка
+    await projectService.loadProjects();
+    
+    // Используем первый доступный проект или создаем временный
+    let projectId = 'default-project';
+    const projectsResponse = await projectService.listProjects();
+    logger.info('AIService: Available projects', { 
+      totalProjects: projectsResponse.projects.length,
+      projects: projectsResponse.projects.map(p => ({ id: p.id, name: p.name, path: p.path }))
+    });
+    
+    if (projectsResponse.projects.length > 0) {
+      projectId = projectsResponse.projects[0].id;
+      logger.info('AIService: Using first available project', { 
+        projectId, 
+        projectName: projectsResponse.projects[0].name 
+      });
+    } else {
+      logger.warn('AIService: No projects available, using default ID', { projectId });
+    }
+    
+    const config = new CustomConfig({
       sessionId: options.sessionId,
       embeddingModel: options.embeddingModel || DEFAULT_GEMINI_EMBEDDING_MODEL,
       targetDir: workingDir,
@@ -191,7 +251,7 @@ export class AIService {
       listExtensions: false,
       activeExtensions: [],
       noBrowser: false,
-    });
+    }, terminalService, projectId);
 
     await config.initialize();
     await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
@@ -275,6 +335,8 @@ export class AIService {
       const geminiClient = config.getGeminiClient();
       const toolRegistry = await config.getToolRegistry();
 
+
+
       const chat = await geminiClient.getChat();
       const abortController = new AbortController();
       
@@ -336,12 +398,12 @@ export class AIService {
       if (isStream) {
         return this.processStream(
           chat, toolRegistry, currentMessage, turnCount, responseText, toolCalls, 
-          prompt_id, abortController, sessionId, projectPath, config
+          prompt_id, abortController, sessionId, projectPath, config, options
         );
       } else {
         return this.processSync(
           chat, toolRegistry, currentMessage, turnCount, responseText, toolCalls,
-          prompt_id, abortController, sessionId, projectPath, config
+          prompt_id, abortController, sessionId, projectPath, config, options
         );
       }
     } catch (error) {
@@ -379,7 +441,8 @@ export class AIService {
     abortController: AbortController,
     _sessionId: string,
     _projectPath: string,
-    config: Config
+    config: Config,
+    _options: Partial<AIServiceOptions> = {}
   ): Promise<AIResponse> {
     while (turnCount < 10) {
       turnCount++;
@@ -436,6 +499,8 @@ export class AIService {
           logger.info(`🔧 [${new Date().toISOString()}] Вызов инструмента: ${fc.name}`);
           logger.debug('📋 Аргументы:', JSON.stringify(fc.args, null, 2));
 
+          // Выполняем инструмент через стандартный обработчик
+          // Теперь run_shell_command будет использовать наш кастомный инструмент
           const toolResponse = await RetryUtils.executeWithRetry(
             () => executeToolCall(config, requestInfo, toolRegistry, abortController.signal),
             { maxRetries: 2 }
@@ -516,7 +581,8 @@ export class AIService {
     abortController: AbortController,
     _sessionId: string,
     _projectPath: string,
-    config: Config
+    config: Config,
+    options: Partial<AIServiceOptions> = {}
   ): AsyncGenerator<AIStreamEvent> {
     yield {
       type: 'start',
@@ -610,6 +676,8 @@ export class AIService {
             tool: { name: fc.name || '', args: fc.args || {} }
           };
 
+          // Выполняем инструмент через стандартный обработчик
+          // Теперь run_shell_command будет использовать наш кастомный инструмент
           const toolResponse = await RetryUtils.executeWithRetry(
             () => executeToolCall(config, requestInfo, toolRegistry, abortController.signal),
             { maxRetries: 2 }
@@ -679,7 +747,7 @@ export class AIService {
 
         // Для следующего поворота используем результат инструментов
         const nextMessage = { role: 'user', parts: toolResponseParts };
-        yield* this.processStream(chat, toolRegistry, nextMessage, turnCount, responseText, toolCalls, prompt_id, abortController, _sessionId, _projectPath, config);
+        yield* this.processStream(chat, toolRegistry, nextMessage, turnCount, responseText, toolCalls, prompt_id, abortController, _sessionId, _projectPath, config, options);
       } else {
         yield {
           type: 'complete',

@@ -13,6 +13,13 @@ export class ProjectService {
   constructor(workspaceDir: string) {
     this.projectsDir = join(workspaceDir, 'projects');
     this.projectsFile = join(this.projectsDir, '.projects.json');
+    
+    logger.info('ProjectService: Constructor called', {
+      workspaceDir,
+      projectsDir: this.projectsDir,
+      projectsFile: this.projectsFile
+    });
+    
     this.initializeProjectsDirectory();
   }
 
@@ -30,8 +37,12 @@ export class ProjectService {
     }
   }
 
-  private async loadProjects(): Promise<void> {
+  async loadProjects(): Promise<void> {
     try {
+      logger.info('ProjectService: Loading projects from file', {
+        projectsFile: this.projectsFile
+      });
+      
       const data = await fs.readFile(this.projectsFile, 'utf8');
       const projectsData = JSON.parse(data);
       
@@ -44,10 +55,17 @@ export class ProjectService {
           lastAccessed: new Date(project.lastAccessed)
         });
       }
+      
+      logger.info('ProjectService: Projects loaded successfully', {
+        totalProjects: this.projects.size,
+        projectIds: Array.from(this.projects.keys())
+      });
     } catch (error) {
       const errorWithCode = error as { code?: string };
       if (errorWithCode.code !== 'ENOENT') {
         logger.error('Ошибка загрузки проектов:', this.formatError(error));
+      } else {
+        logger.info('ProjectService: Projects file not found, starting with empty projects list');
       }
     }
   }
@@ -132,6 +150,12 @@ export class ProjectService {
 
   async listProjects(): Promise<ProjectListResponse> {
     const projects = Array.from(this.projects.values());
+    
+    logger.info('ProjectService: listProjects called', {
+      totalProjects: projects.length,
+      projectIds: projects.map(p => p.id),
+      projectNames: projects.map(p => p.name)
+    });
     
     return {
       projects,

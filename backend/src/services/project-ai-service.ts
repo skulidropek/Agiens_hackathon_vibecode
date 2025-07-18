@@ -15,15 +15,19 @@ export interface ProjectAIOptions {
   debugMode?: boolean;
 }
 
+import { TerminalService } from './terminal-service';
+
 export class ProjectAIService {
   private aiService: AIService;
   public projectService: ProjectService;
   private projectChatService: ProjectChatService;
+  private terminalService: TerminalService;
 
-  constructor(projectService: ProjectService) {
-    this.aiService = new AIService();
+  constructor(projectService: ProjectService, terminalService: TerminalService) {
+    this.aiService = new AIService(terminalService);
     this.projectService = projectService;
     this.projectChatService = new ProjectChatService(projectService);
+    this.terminalService = terminalService;
   }
 
   async initialize(options: ProjectAIOptions): Promise<void> {

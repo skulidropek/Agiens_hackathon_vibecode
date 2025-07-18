@@ -53,10 +53,10 @@ const swaggerSpec = swaggerJSDoc(swaggerOptions);
 // Инициализация сервисов
 const projectService = new ProjectService(config.workspaceDir);
 const projectChatService = new ProjectChatService(projectService);
-const aiService = new AIService();
-const projectAIService = new ProjectAIService(projectService);
-const fileWatcherService = new FileWatcherService(projectService);
 const terminalService = new TerminalService(config, projectService);
+const aiService = new AIService(terminalService);
+const projectAIService = new ProjectAIService(projectService, terminalService);
+const fileWatcherService = new FileWatcherService(projectService);
 
 // Middleware
 app.use(helmet());

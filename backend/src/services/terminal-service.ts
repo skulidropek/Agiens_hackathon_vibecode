@@ -123,7 +123,9 @@ export class TerminalService {
         command: session.command,
         projectId: request.projectId,
         pid: ptyProcess.pid,
-        cwd
+        cwd,
+        totalSessions: this.sessions.size,
+        allSessionIds: Array.from(this.sessions.keys())
       });
 
       return session;
@@ -144,14 +146,27 @@ export class TerminalService {
    * Get terminal session by ID
    */
   public getSession(sessionId: string): TerminalSession | undefined {
-    return this.sessions.get(sessionId);
+    const session = this.sessions.get(sessionId);
+    logger.info('TerminalService: getSession called', {
+      sessionId,
+      found: !!session,
+      totalSessions: this.sessions.size
+    });
+    return session;
   }
 
   /**
    * Get all terminal sessions
    */
   public getAllSessions(): TerminalSession[] {
-    return Array.from(this.sessions.values());
+    const sessions = Array.from(this.sessions.values());
+    logger.info('TerminalService: getAllSessions called', {
+      totalSessions: sessions.length,
+      sessionIds: sessions.map(s => s.id),
+      projectIds: sessions.map(s => s.projectId),
+      sessionMapSize: this.sessions.size
+    });
+    return sessions;
   }
 
   /**
