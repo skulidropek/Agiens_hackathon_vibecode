@@ -278,31 +278,48 @@ export class AIService {
       const chat = await geminiClient.getChat();
       const abortController = new AbortController();
       
-      // Создаем сообщения с учетом истории чата
-      const currentMessages: Content[] = [];
+      // Подготавливаем историю для chat объекта
+      const chatHistory: Content[] = [];
       
-      // Добавляем историю чата, если есть (ограничиваем последними 10 сообщениями для контекста)
+      // Добавляем историю чата, если есть (фильтруем технические сообщения)
       if (options.aiContext?.chatHistory && options.aiContext.chatHistory.length > 0) {
-        const recentHistory = options.aiContext.chatHistory.slice(-10); // Берем последние 10 сообщений
-        logger.info(`Adding ${recentHistory.length} recent messages from chat history to context (out of ${options.aiContext.chatHistory.length} total)`);
+        logger.info(`Loading ${options.aiContext.chatHistory.length} messages from chat history`);
         
-        // Конвертируем историю чата в формат Content
-        for (const msg of recentHistory) {
-          currentMessages.push({
+        // Фильтруем только нормальные сообщения (не технические JSON)
+        const filteredHistory = options.aiContext.chatHistory.filter(msg => {
+          // Исключаем технические сообщения
+          if (msg.content.startsWith('{"type":"') && msg.content.includes('"timestamp"')) {
+            return false;
+          }
+          // Исключаем пустые сообщения
+          if (!msg.content.trim()) {
+            return false;
+          }
+          return true;
+        });
+        
+        logger.info(`Filtered to ${filteredHistory.length} normal messages (excluded ${options.aiContext.chatHistory.length - filteredHistory.length} technical messages)`);
+        
+        // Конвертируем отфильтрованную историю чата в формат Content
+        for (const msg of filteredHistory) {
+          chatHistory.push({
             role: msg.sender === 'user' ? 'user' : 'model',
             parts: [{ text: msg.content }]
           });
         }
       }
       
-      // Добавляем текущее сообщение пользователя
-      currentMessages.push({ role: 'user', parts: [{ text: input }] });
+      // Устанавливаем историю в chat объект
+      chat.setHistory(chatHistory);
+      
+      // Текущее сообщение будем отправлять отдельно
+      const currentMessage = { role: 'user', parts: [{ text: input }] };
       
       // Логируем контекст, который отправляется в AI
       logger.info('🤖 AI Context Summary:');
-      logger.info(`   - Total messages in context: ${currentMessages.length}`);
+      logger.info(`   - Total messages in history: ${chatHistory.length}`);
       logger.info(`   - Current user input: "${input.substring(0, 100)}${input.length > 100 ? '...' : ''}"`);
-      logger.info(`   - Recent history messages: ${currentMessages.slice(0, -1).map(m => {
+      logger.info(`   - History messages: ${chatHistory.map(m => {
         const text = m.parts?.[0]?.text || 'No text';
         return `${m.role}: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`;
       }).join(', ')}`);
@@ -318,12 +335,12 @@ export class AIService {
 
       if (isStream) {
         return this.processStream(
-          chat, toolRegistry, currentMessages, turnCount, responseText, toolCalls, 
+          chat, toolRegistry, currentMessage, turnCount, responseText, toolCalls, 
           prompt_id, abortController, sessionId, projectPath, config
         );
       } else {
         return this.processSync(
-          chat, toolRegistry, currentMessages, turnCount, responseText, toolCalls,
+          chat, toolRegistry, currentMessage, turnCount, responseText, toolCalls,
           prompt_id, abortController, sessionId, projectPath, config
         );
       }
@@ -354,7 +371,7 @@ export class AIService {
   private async processSync(
     chat: GeminiChat,
     toolRegistry: ToolRegistry,
-    currentMessages: Content[],
+    currentMessage: Content,
     turnCount: number,
     responseText: string,
     toolCalls: Array<{ name: string; args: Record<string, unknown>; result?: string; error?: string; }>,
@@ -368,20 +385,10 @@ export class AIService {
       turnCount++;
       const functionCalls: FunctionCall[] = [];
 
-      // Отправляем всю историю сообщений в чат через sendMessage
-      for (let i = 0; i < currentMessages.length - 1; i++) {
-        await chat.sendMessage({
-          message: currentMessages[i].parts || [],
-          config: {
-            abortSignal: abortController.signal,
-          },
-        }, prompt_id);
-      }
-      
-      // Отправляем текущее сообщение через sendMessageStream
+      // Отправляем текущее сообщение - история уже установлена в chat
       const responseStream = await chat.sendMessageStream(
         {
-          message: currentMessages[currentMessages.length - 1]?.parts || [],
+          message: currentMessage.parts || [],
           config: {
             abortSignal: abortController.signal,
             tools: [
@@ -475,7 +482,9 @@ export class AIService {
           }
         }
 
-        currentMessages = [{ role: 'user', parts: toolResponseParts }];
+        // Для следующего поворота используем результат инструментов
+        const nextMessage = { role: 'user', parts: toolResponseParts };
+        return this.processSync(chat, toolRegistry, nextMessage, turnCount, responseText, toolCalls, prompt_id, abortController, _sessionId, _projectPath, config);
       } else {
         return {
           success: true,
@@ -499,7 +508,7 @@ export class AIService {
   private async *processStream(
     chat: GeminiChat,
     toolRegistry: ToolRegistry,
-    currentMessages: Content[],
+    currentMessage: Content,
     turnCount: number,
     responseText: string,
     toolCalls: Array<{ name: string; args: Record<string, unknown>; result?: string; error?: string; }>,
@@ -520,20 +529,10 @@ export class AIService {
       const functionCalls: FunctionCall[] = [];
       let responseText = '';
 
-      // Отправляем всю историю сообщений в чат через sendMessage
-      for (let i = 0; i < currentMessages.length - 1; i++) {
-        await chat.sendMessage({
-          message: currentMessages[i].parts || [],
-          config: {
-            abortSignal: abortController.signal,
-          },
-        }, prompt_id);
-      }
-      
-      // Отправляем текущее сообщение через sendMessageStream
+      // Отправляем текущее сообщение - история уже установлена в chat
       const responseStream = await chat.sendMessageStream(
         {
-          message: currentMessages[currentMessages.length - 1]?.parts || [],
+          message: currentMessage.parts || [],
           config: {
             abortSignal: abortController.signal,
             tools: [
@@ -678,7 +677,9 @@ export class AIService {
           tools: toolCalls
         };
 
-        currentMessages = [{ role: 'user', parts: toolResponseParts }];
+        // Для следующего поворота используем результат инструментов
+        const nextMessage = { role: 'user', parts: toolResponseParts };
+        yield* this.processStream(chat, toolRegistry, nextMessage, turnCount, responseText, toolCalls, prompt_id, abortController, _sessionId, _projectPath, config);
       } else {
         yield {
           type: 'complete',
