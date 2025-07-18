@@ -142,6 +142,8 @@ export interface WebSocketConnection {
   sessionId?: string;
   isAlive: boolean;
   lastPing: Date;
+  terminalListSubscriber?: boolean;
+  terminalListProjectId?: string;
 }
 
 export type WebSocketEventType = 'open' | 'close' | 'error' | 'message' | 'ping' | 'pong';
@@ -369,6 +371,34 @@ export interface TerminalUnsubscription extends BaseWebSocketMessage {
   };
 }
 
+export interface TerminalListSubscription extends BaseWebSocketMessage {
+  type: 'subscribe_terminal_list';
+  payload: {
+    projectId?: string;
+  };
+}
+
+export interface TerminalListUnsubscription extends BaseWebSocketMessage {
+  type: 'unsubscribe_terminal_list';
+  payload: Record<string, never>;
+}
+
+export interface TerminalListUpdate extends BaseWebSocketMessage {
+  type: 'terminal_list_update';
+  payload: {
+    terminals: Array<{
+      id: string;
+      command: string;
+      projectId: string;
+      cwd: string;
+      startTime: string;
+      lastActivity: string;
+      isActive: boolean;
+      pid: number;
+    }>;
+  };
+}
+
 export interface TerminalResize extends BaseWebSocketMessage {
   type: 'terminal_resize';
   payload: {
@@ -388,6 +418,9 @@ export type WebSocketMessageType =
   | TerminalStatus 
   | TerminalSubscription
   | TerminalUnsubscription
+  | TerminalListSubscription
+  | TerminalListUnsubscription
+  | TerminalListUpdate
   | TerminalResize
   | FileChange
   | FileWatchStart

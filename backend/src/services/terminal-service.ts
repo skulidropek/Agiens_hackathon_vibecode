@@ -118,6 +118,11 @@ export class TerminalService {
 
       this.sessions.set(sessionId, session);
 
+      // Уведомляем об обновлении списка терминалов
+      if (this.onTerminalListUpdate) {
+        this.onTerminalListUpdate();
+      }
+
       logger.info('Terminal session created', {
         sessionId,
         command: session.command,
@@ -265,6 +270,10 @@ export class TerminalService {
       // Don't delete immediately, allow for cleanup
       setTimeout(() => {
         this.sessions.delete(sessionId);
+        // Уведомляем об обновлении списка терминалов
+        if (this.onTerminalListUpdate) {
+          this.onTerminalListUpdate();
+        }
       }, 5000);
 
       return true;
@@ -324,6 +333,7 @@ export class TerminalService {
   public onSessionOutput?: (sessionId: string, data: string) => void;
   public onSessionExit?: (sessionId: string, exitCode: number) => void;
   public onSessionError?: (sessionId: string, error: string) => void;
+  public onTerminalListUpdate?: () => void;
 
   /**
    * Setup PTY event handlers for a session
@@ -413,6 +423,11 @@ export class TerminalService {
         }
         
         this.sessions.delete(sessionId);
+        
+        // Уведомляем об обновлении списка терминалов
+        if (this.onTerminalListUpdate) {
+          this.onTerminalListUpdate();
+        }
       }
     }
   }

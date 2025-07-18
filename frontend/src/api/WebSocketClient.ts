@@ -241,4 +241,12 @@ export class WebSocketClient {
     // Отправляем команду изменения размера через основной WebSocket
     this.sendMessage({ type: 'terminal_resize', payload: { terminalId, ...size } });
   }
+
+  public subscribeToTerminalList(projectId?: string): void {
+    this.sendMessage({ type: 'subscribe_terminal_list', payload: { projectId } });
+  }
+
+  public unsubscribeFromTerminalList(): void {
+    this.sendMessage({ type: 'unsubscribe_terminal_list', payload: {} });
+  }
 } 

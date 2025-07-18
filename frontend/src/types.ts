@@ -22,7 +22,9 @@ export type WebSocketCommand =
   | { type: 'subscribe_terminal'; payload: { terminalId: string } }
   | { type: 'unsubscribe_terminal'; payload: { terminalId: string } }
   | { type: 'terminal_input'; payload: { terminalId: string; data: string } }
-  | { type: 'terminal_resize'; payload: { terminalId: string; cols: number; rows: number } };
+  | { type: 'terminal_resize'; payload: { terminalId: string; cols: number; rows: number } }
+  | { type: 'subscribe_terminal_list'; payload: { projectId?: string } }
+  | { type: 'unsubscribe_terminal_list'; payload: Record<string, never> };
 
 // --- WebSocket Messages (Server -> Client) ---
 
@@ -77,10 +79,26 @@ export interface TerminalEventMessage {
   data?: unknown;
 }
 
+export interface TerminalListUpdateMessage {
+  type: 'terminal_list_update';
+  terminals: Array<{
+    id: string;
+    command: string;
+    projectId: string;
+    cwd: string;
+    startTime: string;
+    lastActivity: string;
+    isActive: boolean;
+    pid: number;
+  }>;
+  timestamp: string;
+}
+
 export type WebSocketMessage =
   | ConnectionEstablishedMessage
   | FileWatchStartedMessage
   | ErrorMessage
   | FileEventMessage
   | TerminalOutputMessage
-  | TerminalEventMessage; 
+  | TerminalEventMessage
+  | TerminalListUpdateMessage; 

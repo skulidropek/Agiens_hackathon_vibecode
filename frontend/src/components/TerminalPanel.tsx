@@ -1,11 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { XTerminalInstance } from './XTerminalInstance';
 import styles from './TerminalPanel.module.css';
+import { useWebSocket } from '../hooks/useWebSocket';
 
 // A minimal type definition to help with development
 interface TerminalSession {
   id: string;
-  // Add other properties as needed
+  command: string;
+  projectId: string;
+  cwd: string;
+  startTime: string;
+  lastActivity: string;
+  isActive: boolean;
+  pid: number;
 }
 
 export const TerminalPanel: React.FC<{ projectId: string, isVisible: boolean }> = ({ projectId, isVisible }) => {
@@ -13,6 +20,7 @@ export const TerminalPanel: React.FC<{ projectId: string, isVisible: boolean }> 
   const [activeTerminalId, setActiveTerminalId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { client, subscribe } = useWebSocket();
 
   const fetchTerminals = useCallback(async () => {
     if (!projectId) return;
@@ -37,6 +45,31 @@ export const TerminalPanel: React.FC<{ projectId: string, isVisible: boolean }> 
       setLoading(false);
     }
   }, [projectId, activeTerminalId]);
+
+  // WebSocket подписка на обновления списка терминалов
+  useEffect(() => {
+    if (!isVisible || !client) return;
+
+    // Подписываемся на обновления списка терминалов
+    client.subscribeToTerminalList(projectId);
+
+    // Подписываемся на WebSocket сообщения
+    const unsubscribe = subscribe((message) => {
+      if (message.type === 'terminal_list_update') {
+        setTerminals(message.terminals);
+        // Если нет активного терминала, выбираем первый
+        if (!activeTerminalId && message.terminals.length > 0) {
+          setActiveTerminalId(message.terminals[0].id);
+        }
+      }
+    });
+
+    // Отписываемся при размонтировании
+    return () => {
+      unsubscribe();
+      client.unsubscribeFromTerminalList();
+    };
+  }, [isVisible, client, subscribe, projectId, activeTerminalId]);
 
   useEffect(() => {
     if (isVisible) {

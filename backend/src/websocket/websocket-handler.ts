@@ -14,7 +14,7 @@ import {
 import { FileWatcherService } from '../services/file-watcher-service';
 import { ProjectService } from '../services/project-service';
 import { TerminalHandler } from './terminal-handler';
-import { TerminalService } from '../services/terminal-service';
+import { TerminalService, TerminalSession } from '../services/terminal-service';
 import { ChatHandler } from './chat-handler';
 import { ProjectChatService } from '../services/project-chat-service';
 import { AppConfig } from '../config/app-config';
@@ -26,6 +26,45 @@ const projectChatService = new ProjectChatService(projectService);
 const terminalService = new TerminalService(config, projectService);
 const terminalHandler = new TerminalHandler(terminalService);
 const chatHandler = new ChatHandler(projectChatService);
+
+// Функция для отправки обновлений списка терминалов всем подписчикам
+function broadcastTerminalListUpdate(projectId?: string): void {
+  const terminals = projectId ? terminalService.getSessionsByProject(projectId) : terminalService.getAllSessions();
+  const terminalList = terminals.map((session: TerminalSession) => ({
+    id: session.id,
+    command: session.command,
+    projectId: session.projectId,
+    cwd: session.cwd,
+    startTime: session.startTime.toISOString(),
+    lastActivity: session.lastActivity.toISOString(),
+    isActive: session.isActive,
+    pid: session.pid
+  }));
+
+  connections.forEach((connection) => {
+    if (connection.terminalListSubscriber && connection.ws.readyState === connection.ws.OPEN) {
+      // Если подписчик фильтрует по projectId, отправляем только соответствующие терминалы
+      if (connection.terminalListProjectId) {
+        const filteredTerminals = terminalList.filter(t => t.projectId === connection.terminalListProjectId);
+        sendMessage(connection.ws, {
+          type: 'terminal_list_update',
+          terminals: filteredTerminals,
+          timestamp: new Date().toISOString()
+        });
+      } else {
+        // Отправляем все терминалы
+        sendMessage(connection.ws, {
+          type: 'terminal_list_update',
+          terminals: terminalList,
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+  });
+}
+
+// Устанавливаем callback для обновления списка терминалов
+terminalService.onTerminalListUpdate = broadcastTerminalListUpdate;
 
 export const setupWebSocketRoutes = (wss: WebSocketServer, projectService: ProjectService, fileWatcherService: FileWatcherService): void => {
   wss.on('connection', (ws, req) => {
@@ -112,6 +151,14 @@ export const setupWebSocketRoutes = (wss: WebSocketServer, projectService: Proje
           
           case 'terminal_resize':
             await handleTerminalResize(connection, message as { type: string; payload: { terminalId: string; cols: number; rows: number } });
+            break;
+          
+          case 'subscribe_terminal_list':
+            await handleTerminalListSubscription(connection, message as { type: string; payload: { projectId?: string } });
+            break;
+          
+          case 'unsubscribe_terminal_list':
+            await handleTerminalListUnsubscription(connection, message as { type: string; payload: Record<string, never> });
             break;
           
           case 'file_watch_start':
@@ -545,6 +592,74 @@ function sendErrorMessage(ws: WebSocketLike, message: string, code: string): voi
     code,
     timestamp: new Date().toISOString()
   });
+}
+
+// Обработка подписки на список терминалов
+async function handleTerminalListSubscription(connection: WebSocketConnection, message: { type: string; payload: { projectId?: string } }): Promise<void> {
+  try {
+    if (connection.type !== 'terminal') {
+      throw new Error('Terminal list subscription only allowed on terminal connections');
+    }
+
+    const { projectId } = message.payload;
+    
+    logger.info('Terminal list subscription', {
+      connectionId: connection.id,
+      projectId: projectId || 'all',
+    });
+
+    // Добавляем соединение в список подписчиков на обновления терминалов
+    connection.terminalListSubscriber = true;
+    connection.terminalListProjectId = projectId;
+
+    // Отправляем текущий список терминалов
+    const terminals = projectId ? terminalService.getSessionsByProject(projectId) : terminalService.getAllSessions();
+    sendMessage(connection.ws, {
+      type: 'terminal_list_update',
+      terminals: terminals.map((session: TerminalSession) => ({
+        id: session.id,
+        command: session.command,
+        projectId: session.projectId,
+        cwd: session.cwd,
+        startTime: session.startTime.toISOString(),
+        lastActivity: session.lastActivity.toISOString(),
+        isActive: session.isActive,
+        pid: session.pid
+      })),
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    logger.error('Error handling terminal list subscription', {
+      connectionId: connection.id,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    sendErrorMessage(connection.ws, 'Failed to subscribe to terminal list', 'TERMINAL_LIST_SUBSCRIPTION_ERROR');
+  }
+}
+
+// Обработка отписки от списка терминалов
+async function handleTerminalListUnsubscription(connection: WebSocketConnection, _message: { type: string; payload: Record<string, never> }): Promise<void> {
+  try {
+    if (connection.type !== 'terminal') {
+      throw new Error('Terminal list unsubscription only allowed on terminal connections');
+    }
+
+    logger.info('Terminal list unsubscription', {
+      connectionId: connection.id,
+    });
+
+    // Удаляем соединение из списка подписчиков
+    connection.terminalListSubscriber = false;
+    connection.terminalListProjectId = undefined;
+
+  } catch (error) {
+    logger.error('Error handling terminal list unsubscription', {
+      connectionId: connection.id,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    sendErrorMessage(connection.ws, 'Failed to unsubscribe from terminal list', 'TERMINAL_LIST_UNSUBSCRIPTION_ERROR');
+  }
 }
 
 // Экспортируем функции для использования в других модулях
